@@ -13,6 +13,14 @@ set -uo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 fail=0
 
+# 跟 scripts/install.sh 用同一種偵測方式（uname -s，比 uname -o 更可攜——macOS
+# 沒有 -o），確保這裡「該不該跑 MSYS 專屬情境」的判斷跟被測試對象本身的判斷邏輯
+# 一致，不會出現測試環境判斷跟腳本內部判斷分歧、各測各的的情況。
+is_msys=0
+case "$(uname -s 2>/dev/null)" in
+  MINGW*|MSYS*|CYGWIN*) is_msys=1 ;;
+esac
+
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
@@ -180,11 +188,11 @@ fi
 
 # 情境 8：target 用 Windows 原生 drive-letter 形式（D:/...）指向來源 skills/ 底下
 # 一個原本不存在的子目錄——跟情境 4 測的是同一個危險落點，但用不同的路徑「表示法」
-# 呈現。只在 Windows/Git Bash（MSYS，`uname -o` 回報 Msys）環境下才有意義：這是
-# `realpath -m` 對尚未存在的路徑只做純文字正規化、不會把 drive-letter 前綴轉成
-# /d/... 形式，導致跟 `cd -P/pwd -P` 產生的 skills_src 字串對不上、漏判重疊的具體
-# 情境（修法前：mkdir -p 會先把子目錄建到來源目錄裡面，才在事後檢查被抓到）。
-if [ "$(uname -o 2>/dev/null)" = "Msys" ]; then
+# 呈現。只在 Windows/Git Bash（MSYS）環境下才有意義：這是 `realpath -m` 對尚未存在
+# 的路徑只做純文字正規化、不會把 drive-letter 前綴轉成 /d/... 形式，導致跟
+# `cd -P/pwd -P` 產生的 skills_src 字串對不上、漏判重疊的具體情境（修法前：
+# mkdir -p 會先把子目錄建到來源目錄裡面，才在事後檢查被抓到）。
+if [ "${is_msys}" -eq 1 ]; then
   native_new_subdir_msys="${isolated_repo}/skills/newsub-native-drive-form"
   # 把隔離副本的 MSYS 路徑（/d/foo/...）轉成 Windows 原生 drive-letter 形式
   # （D:/foo/...），模擬呼叫端直接貼上 Windows 原生路徑當 target 的情境。
@@ -205,7 +213,7 @@ fi
 # Windows/Git Bash（MSYS）環境下有意義——非 Windows 環境沒有 drive-letter 路徑，
 # 這幾個字串會被當成一般的（多半不存在或無寫入權限的）POSIX 路徑處理，不構成同一種
 # 風險。
-if [ "$(uname -o 2>/dev/null)" = "Msys" ]; then
+if [ "${is_msys}" -eq 1 ]; then
   for drive_root_form in "D:/" 'D:\' "C:/"; do
     if output="$(bash "${isolated_repo}/scripts/install.sh" "${drive_root_form}" 2>&1)"; then
       echo "FAIL: install.sh 對 Windows drive root target '${drive_root_form}' 應該失敗，但卻成功了"
@@ -221,6 +229,56 @@ if [ "$(uname -o 2>/dev/null)" = "Msys" ]; then
   assert_sources_intact "『target 是 Windows drive root』"
 else
   echo "SKIP: 目前環境不是 Windows/Git Bash（MSYS），跳過情境 9（drive root 拒絕只在該環境下有意義）"
+fi
+
+# 情境 10：target 用跟 skills_src 大小寫不同（但實際上是磁碟上同一個目錄）的形式，
+# 指向來源 skills/ 底下一個原本不存在的子目錄。只在 Windows/Git Bash（MSYS）環境下
+# 有意義——NTFS 預設不分大小寫但保留大小寫，這裡是「realpath -m 與 cd -P/pwd -P 的
+# drive-letter 已經正規化一致，但路徑其餘部分大小寫仍不同」這個殘餘風險：本地實測
+# 過（見 scripts/install.sh 的註解），修法前這種大小寫不同的路徑會被誤判成跟
+# skills_src 不重疊而放行，讓 mkdir -p 把新目錄建到磁碟上同一個實際目錄（技能來源
+# 目錄）底下。
+if [ "${is_msys}" -eq 1 ]; then
+  case_mismatch_subdir_lower="${isolated_repo}/skills/newsub-case-mismatch"
+  # 把整個路徑轉大寫，模擬呼叫端用跟磁碟上實際大小寫不同的形式指向同一個目錄。
+  case_mismatch_subdir_upper="$(printf '%s' "${case_mismatch_subdir_lower}" | tr '[:lower:]' '[:upper:]')"
+  assert_rejected_with "install.sh 對『target 與來源 skills/ 大小寫不同但磁碟上是同一個目錄』" \
+    "${case_mismatch_subdir_upper}" "來源目錄"
+  if [ -e "${case_mismatch_subdir_lower}" ]; then
+    echo "FAIL: install.sh 在拒絕『target 與來源 skills/ 大小寫不同但磁碟上是同一個目錄』之前，就已經把 '${case_mismatch_subdir_lower}' 建立出來了（污染來源目錄——NTFS 不分大小寫但路徑比對區分大小寫造成漏判）"
+    fail=1
+  fi
+  assert_sources_intact "『target 與來源 skills/ 大小寫不同但磁碟上是同一個目錄』"
+else
+  echo "SKIP: 目前環境不是 Windows/Git Bash（MSYS），跳過情境 10（NTFS 大小寫不敏感只在該環境下有意義）"
+fi
+
+# 情境 11：反向情境——只在「非」MSYS（真正的 POSIX 檔案系統，大小寫不同就是不同
+# 目錄）環境下有意義。驗證兩件事，避免情境 8-10 的 MSYS 專屬修正對 Linux/macOS 造成
+# 誤傷：(a) 一個字面上長得像 Windows drive root 的 bare 單字母絕對路徑（例如 "/x"）
+# 不會被誤判成 drive root 而拒絕——install.sh 可能因為權限或其他原因失敗，但錯誤
+# 訊息不能是「drive root」；(b) target 跟 skills_src 只有大小寫不同、實際上是磁碟上
+# 兩個不同的目錄時，不能被誤判成重疊而拒絕——必須正常安裝成功。
+if [ "${is_msys}" -ne 1 ]; then
+  bare_single_letter_output="$(bash "${isolated_repo}/scripts/install.sh" "/x" 2>&1)" || true
+  if printf '%s' "${bare_single_letter_output}" | grep -qi "drive root"; then
+    echo "FAIL: 非 MSYS 環境下，install.sh 把字面上的 bare 單字母路徑 '/x' 誤判成 Windows drive root 而拒絕"
+    echo "  實際輸出: ${bare_single_letter_output}"
+    fail=1
+  fi
+
+  case_diff_target="$(printf '%s' "${isolated_repo}/skills" | tr '[:lower:]' '[:upper:]')"
+  if [ "${case_diff_target}" != "${isolated_repo}/skills" ]; then
+    if ! case_diff_output="$(bash "${isolated_repo}/scripts/install.sh" "${case_diff_target}" 2>&1)"; then
+      echo "FAIL: 非 MSYS（大小寫敏感）環境下，install.sh 把跟 skills_src 只有大小寫不同、實際是不同目錄的 target 誤判成重疊而拒絕"
+      echo "  實際輸出: ${case_diff_output}"
+      fail=1
+    fi
+    assert_sources_intact "『非 MSYS 環境下 target 與來源 skills/ 只有大小寫不同（不同目錄）』"
+    rm -rf "${case_diff_target}"
+  fi
+else
+  echo "SKIP: 目前環境是 Windows/Git Bash（MSYS），跳過情境 11（驗證非 MSYS 平台不被 MSYS 專屬修正誤傷，只在非 MSYS 平台下有意義）"
 fi
 
 if [ "${fail}" -eq 0 ]; then

@@ -11,6 +11,10 @@
 //     {"name": "...", "descriptionOk": true|false}
 //   field 為 "name"：成功時只印 name 欄位的值（不存在時為空字串）
 //   field 為 "description-ok"：成功時只印 '1'（description 存在且為非空字串）或 '0'
+//   field 為 "description-base64"：成功時印出 description 欄位的原始值（不存在時
+//     為空字串）以 base64 編碼後的單行結果——description 可能含換行（block scalar），
+//     用 base64 編碼才能維持「輸出恆為單行」的不變量，同時讓呼叫端（測試）能解碼
+//     取得完整、未經呼叫端自行重新實作擷取邏輯的真實解析結果，直接比對內容。
 //
 // 不管哪種模式，輸出永遠保證只有一行、不含 CR/LF：name 欄位若含有 CR 或 LF
 // （例如用 YAML 的 literal/folded block scalar 或跳脫字元塞進換行）一律視為不合法
@@ -71,7 +75,12 @@ function main() {
     );
     process.exit(2);
   }
-  if (field !== undefined && field !== "name" && field !== "description-ok") {
+  if (
+    field !== undefined &&
+    field !== "name" &&
+    field !== "description-ok" &&
+    field !== "description-base64"
+  ) {
     process.stderr.write(`未知的 field: ${JSON.stringify(field)}\n`);
     process.exit(2);
   }
@@ -117,8 +126,9 @@ function main() {
     return;
   }
 
-  const descriptionOk =
-    typeof mapping.description === "string" && mapping.description.trim() !== "";
+  const description =
+    typeof mapping.description === "string" ? mapping.description : "";
+  const descriptionOk = description.trim() !== "";
 
   if (field === "name") {
     process.stdout.write(name + "\n");
@@ -126,6 +136,10 @@ function main() {
   }
   if (field === "description-ok") {
     process.stdout.write((descriptionOk ? "1" : "0") + "\n");
+    return;
+  }
+  if (field === "description-base64") {
+    process.stdout.write(Buffer.from(description, "utf8").toString("base64") + "\n");
     return;
   }
 

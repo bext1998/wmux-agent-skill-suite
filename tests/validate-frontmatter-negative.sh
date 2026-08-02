@@ -132,27 +132,19 @@ description: |
 # example-skill
 EOF
 check_succeeds "block scalar 內縮排的 '---'（非真正分隔線）" "${indented_delimiter_file}"
-# 用 node 直接檢查 description 的實際內容有沒有被提早截斷（沒吃到分隔線後那行）——
-# 光看 exit code／descriptionOk 不夠，截斷後的殘骸通常仍是「非空」的合法 description，
-# 只是內容不完整，必須直接比對內容才抓得到。
-description_content_ok="$(node -e '
-  const fs = require("fs");
-  const yaml = require(process.argv[1]);
-  const text = fs.readFileSync(process.argv[2], "utf8");
-  const lines = text.split(/\r\n|\n/);
-  let endIndex = -1;
-  for (let i = 1; i < lines.length; i++) {
-    if (lines[i] === "---") { endIndex = i; break; }
-  }
-  const fm = lines.slice(1, endIndex).join("\n");
-  const mapping = yaml.load(fm);
-  const desc = mapping && mapping.description;
-  process.stdout.write(
-    typeof desc === "string" && desc.includes("second line after the indented look-alike delimiter") ? "1" : "0"
-  );
-' "${repo_root}/node_modules/js-yaml" "${indented_delimiter_file}")"
-if [ "${description_content_ok}" != "1" ]; then
-  echo "FAIL: block scalar 內縮排的 '---' 測試——description 內容被提早截斷，遺失了分隔線之後的那行"
+# 直接呼叫 parser 本身的 description-base64 輸出比對完整內容，而不是在測試裡另外
+# 獨立重寫一份「正確」的擷取邏輯——先前的寫法用 node -e 內嵌一份跟 parser 分開維護
+# 的擷取器（同樣用 `lines[i] === "---"` 找結尾），如果 parser 本體退回用 trim() 比對
+# （重新引入 bug），這個獨立重寫的擷取器不會受影響、仍然正確，測試就會誤判通過，
+# 完全沒測到 parser 實際的行為。改成直接讀 parser 的輸出，parser 退回 trim() 時
+# description 會被截斷、輸出的 base64 解碼後就不會等於期望的完整內容，測試才會真的抓到。
+expected_description="$(printf 'first line\n---\nsecond line after the indented look-alike delimiter\n')"
+actual_description_b64="$(node "${parser}" "${indented_delimiter_file}" description-base64 2>/dev/null)"
+actual_description="$(printf '%s' "${actual_description_b64}" | base64 -d 2>/dev/null)"
+if [ "${actual_description}" != "${expected_description}" ]; then
+  echo "FAIL: block scalar 內縮排的 '---' 測試——parser 實際輸出的 description 內容不符預期（可能被提早截斷，遺失了分隔線之後的那行）"
+  echo "  期望: $(printf '%s' "${expected_description}" | base64)"
+  echo "  實際: ${actual_description_b64}"
   fail=1
 fi
 
