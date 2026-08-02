@@ -8,9 +8,11 @@ fail=0
 for script in \
   validate-structure.sh \
   validate-frontmatter.sh \
+  validate-frontmatter-negative.sh \
   validate-references.sh \
   validate-no-legacy-names.sh \
-  validate-install-script.sh
+  validate-install-script.sh \
+  validate-install-script-negative.sh
 do
   echo "== ${script} =="
   if ! bash "${test_dir}/${script}"; then
