@@ -1,0 +1,123 @@
+name: Auto Tag Release
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    if: |
+      github.event.pull_request.merged == true &&
+      (
+        contains(github.event.pull_request.labels.*.name, 'release:major') ||
+        contains(github.event.pull_request.labels.*.name, 'release:minor') ||
+        contains(github.event.pull_request.labels.*.name, 'release:patch')
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      # 合併後的 main 先驗證一次，壞掉就不消耗版號
+      - name: Run static validation suite
+        run: bash tests/run-all.sh
+
+      - name: Determine bump type
+        id: bump
+        run: |
+          if [[ "${{ contains(github.event.pull_request.labels.*.name, 'release:major') }}" == "true" ]]; then
+            echo "type=major" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ contains(github.event.pull_request.labels.*.name, 'release:minor') }}" == "true" ]]; then
+            echo "type=minor" >> "$GITHUB_OUTPUT"
+          else
+            echo "type=patch" >> "$GITHUB_OUTPUT"
+          fi
+
+      # 版本進位規則（見 Issue #31 的維護者留言與 docs/SPEC.md#發布流程）：
+      # 專案從 0.0.x 開始時，不套用一般語意化版本「依變更規模決定進哪一位」的規則，
+      # 一律只把第三位數字往上加；只有在第三位數字要進位到雙位數（即目前是
+      # 0.0.9，下一版會變成 0.0.10）的那個時間點，才改用下面依 PR label 決定進位
+      # 位置的一般規則。這裡的具體切換時機是本次對 Issue 留言的最佳詮釋，未經維護者
+      # 逐字確認，正式生效前建議先跟維護者核對一次。
+      - name: Compute next version
+        id: version
+        run: |
+          latest=$(git tag -l 'v*' --sort=-v:refname | head -n1)
+          latest=${latest:-v0.0.0}
+          IFS='.' read -r major minor patch <<< "${latest#v}"
+          if [ "${major}" -eq 0 ] && [ "${minor}" -eq 0 ] && [ "${patch}" -lt 9 ]; then
+            patch=$((patch+1))
+          else
+            case "${{ steps.bump.outputs.type }}" in
+              major) major=$((major+1)); minor=0; patch=0 ;;
+              minor) minor=$((minor+1)); patch=0 ;;
+              patch) patch=$((patch+1)) ;;
+            esac
+          fi
+          next="v${major}.${minor}.${patch}"
+          if git rev-parse "$next" >/dev/null 2>&1; then
+            echo "Tag $next already exists" >&2
+            exit 1
+          fi
+          echo "next=$next" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push tag
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          NEXT_VERSION: ${{ steps.version.outputs.next }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          {
+            printf '%s\n\n' "$PR_TITLE"
+            printf '%s\n\n' "$PR_BODY"
+            printf 'PR #%s: %s\n' "$PR_NUMBER" "$PR_URL"
+          } > /tmp/tag-message.txt
+          git tag -a "$NEXT_VERSION" -F /tmp/tag-message.txt
+          git push origin "$NEXT_VERSION"
+
+      # tag push 用的是本 job 的 GITHUB_TOKEN，GitHub 不會用它觸發 release.yml 的
+      # push-tag 事件，所以打包與建立 Release 必須在同一個 job 內接著做完。
+      - name: Build release archive
+        run: |
+          archive_name="wmux-agent-skill-suite-${{ steps.version.outputs.next }}.zip"
+          zip -r "${archive_name}" \
+            skills \
+            scripts/install.sh \
+            docs/install.md \
+            docs/migration.md \
+            README.md \
+            LICENSE
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          archive_name="wmux-agent-skill-suite-${{ steps.version.outputs.next }}.zip"
+          notes_file="docs/release-notes/${{ steps.version.outputs.next }}.md"
+          if [ -f "${notes_file}" ]; then
+            gh release create "${{ steps.version.outputs.next }}" \
+              "${archive_name}" \
+              --title "${{ steps.version.outputs.next }}" \
+              --notes-file "${notes_file}"
+          else
+            gh release create "${{ steps.version.outputs.next }}" \
+              "${archive_name}" \
+              --title "${{ steps.version.outputs.next }}" \
+              --generate-notes
+          fi
