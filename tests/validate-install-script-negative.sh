@@ -287,6 +287,141 @@ else
   echo "SKIP: 目前環境是 Windows/Git Bash（MSYS），跳過情境 11（驗證非 MSYS 平台不被 MSYS 專屬修正誤傷，只在非 MSYS 平台下有意義）"
 fi
 
+# 情境 12（PR34-CX-5 Finding 1，Major）：target 是單一 "-"。realpath -m 對此的
+# 正規化結果是 CWD 底下一個叫 "-" 的路徑（例如 <cwd>/-），會通過邊界檢查；但修法前
+# 的 mkdir -p 與第二次 cd -P 直接把 target_root 原始字串傳給指令，沒有用 `--`、也
+# 沒有改用已正規化的絕對路徑。`cd -P "-"`（沒有 --）會被 Bash 當成特殊語法
+# `cd -`——不會 cd 進剛剛用 mkdir 建出來的 "-" 目錄，而是跳到 $OLDPWD，且 `cd -`
+# 印出的新目錄那行也一併被 command substitution 吃進去，讓 resolved_root 變成兩行
+# 字串（實測：`$'/some/dir\n/some/dir'` 這種形狀）。淨效果：mkdir -p 已經在呼叫端
+# 的工作目錄下建立了一個叫 "-" 的目錄，但後續驗證與安裝卻對著一個完全不同、且格式
+# 已損毀的路徑繼續動作，最終安裝失敗——這是「先建立/污染，檢查沒過才發現為時已晚」
+# 的具體案例，這次污染的是呼叫端的 CWD，不是 skills_src。這個問題是一般 Bash 行為
+# （`cd -` 特例），不限 MSYS，不用 is_msys gate。
+#
+# 正確行為只有兩種：(a) 乾淨拒絕，完全不在 CWD 建立任何東西；(b) 正確辨識、完整
+# 安裝成功，"-" 目錄裡確實有完整的兩個技能。不允許「建立了一個空的/不完整的
+# "-"，但腳本卻回報失敗」這種半成品狀態——這正是 resolved_root 被 cd -P 特例污染
+# 後的實際後果，也是本情境要抓的紅燈。
+dash_target_cwd="${tmp_dir}/dash-target-cwd"
+mkdir -p "${dash_target_cwd}"
+if [ -e "${dash_target_cwd}/-" ]; then
+  echo "FAIL: 情境 12 前置狀態異常——'${dash_target_cwd}/-' 執行前就已存在"
+  fail=1
+else
+  dash_output="$(cd "${dash_target_cwd}" && bash "${isolated_repo}/scripts/install.sh" "-" 2>&1)"
+  dash_exit=$?
+  if [ -e "${dash_target_cwd}/-" ]; then
+    # 建立了東西：必須是完整、正確安裝好的兩個技能，不能是空的/半成品。
+    if [ ! -f "${dash_target_cwd}/-/wmux-best-practice/SKILL.md" ] || [ ! -f "${dash_target_cwd}/-/wmux-coordinator/SKILL.md" ]; then
+      echo "FAIL: install.sh 對 target='-' 建立了 '${dash_target_cwd}/-'，但裡面沒有完整安裝兩個技能（半成品/空目錄）——exit code ${dash_exit}"
+      echo "  實際輸出: ${dash_output}"
+      fail=1
+    elif [ "${dash_exit}" -ne 0 ]; then
+      echo "FAIL: install.sh 對 target='-' 明明已經完整安裝好兩個技能，卻仍回報失敗（exit code ${dash_exit}）——結果與回報的成功/失敗狀態矛盾"
+      echo "  實際輸出: ${dash_output}"
+      fail=1
+    fi
+  else
+    # 沒建立任何東西：必須是明確、非零的拒絕，不能是「什麼都沒做卻回報成功」。
+    if [ "${dash_exit}" -eq 0 ]; then
+      echo "FAIL: install.sh 對 target='-' 回報成功，但 '${dash_target_cwd}/-' 並不存在——回報的成功狀態與實際結果不符"
+      echo "  實際輸出: ${dash_output}"
+      fail=1
+    fi
+  fi
+fi
+assert_sources_intact "『target 是單一 "-"』"
+rm -rf "${dash_target_cwd}"
+
+# 情境 13（PR34-CX-5 Finding 2，Moderate）：target 是 Windows drive-relative 路徑
+# （drive letter 後面接的不是 / 或 \，例如 "C:foo"）。只在 MSYS 有意義——這是
+# Windows 路徑語意裡「相對於 C: 磁碟機當下工作目錄」的寫法，跟 "C:/foo"（drive
+# 絕對路徑）語意不同。修法前 `to_msys_form` 的正則把 "C:foo" 的斜線視為可選，
+# 誤把它正規化成 "/c/foo"（drive-絕對形式）去做邊界檢查；但真正呼叫 mkdir/cd 的
+# 卻是原始字串 "C:foo"——MSYS 的 mkdir/cd 不理解 Windows drive 語意，把它當成一個
+# CWD-relative、字面上含冒號的普通檔名。也就是說：邊界檢查驗證的是「/c/foo」這個
+# 位置是否安全，但實際 mkdir -p 動作的卻是完全不同的「CWD 底下一個叫 C:foo 的
+# 目錄」——兩者對不上，等於邊界檢查形同虛設。
+#
+# 本情境在 CWD 就是技能來源目錄本身（isolated_repo/skills）的情況下重現：實測過
+# 修法前的行為——第一次（mkdir 前）邊界檢查用 "/c/..." 這個跟 skills_src 完全不
+# 重疊的位置通過，讓 mkdir -p 真的在 skills/ 底下建出一個字面上叫
+# "C:pollute-probe" 的目錄，污染了技能來源目錄本身；雖然第二次（mkdir 後）用
+# cd -P 重新解析出的路徑最終還是抓到重疊而讓整體安裝失敗，但污染已經發生，不能
+# 只看最終 exit code 判斷安全。正確修法必須在任何 mkdir 發生前就直接拒絕這種
+# drive-relative 輸入，不去猜測它實際上對應磁碟上的哪個目錄。
+if [ "${is_msys}" -eq 1 ]; then
+  drive_relative_pollution_target="C:pollute-probe-$$"
+  before_skills_listing="$(ls -A "${isolated_repo}/skills" | sort)"
+  drive_relative_output="$(cd "${isolated_repo}/skills" && bash "${isolated_repo}/scripts/install.sh" "${drive_relative_pollution_target}" 2>&1)"
+  drive_relative_exit=$?
+  after_skills_listing="$(ls -A "${isolated_repo}/skills" | sort)"
+  if [ "${drive_relative_exit}" -eq 0 ]; then
+    echo "FAIL: install.sh 對 Windows drive-relative target '${drive_relative_pollution_target}' 應該失敗，但卻成功了"
+    echo "  實際輸出: ${drive_relative_output}"
+    fail=1
+  fi
+  if [ "${before_skills_listing}" != "${after_skills_listing}" ]; then
+    echo "FAIL: install.sh 在拒絕 Windows drive-relative target '${drive_relative_pollution_target}' 之前，就已經污染了技能來源目錄本身（skills/ 底下多出非預期項目）——邊界檢查驗證的位置跟 mkdir 實際動作的位置對不上"
+    echo "  執行前: ${before_skills_listing}"
+    echo "  執行後: ${after_skills_listing}"
+    echo "  實際輸出: ${drive_relative_output}"
+    fail=1
+    # 清掉污染，避免影響本檔案後續情境或殘留在 isolated_repo。
+    rm -rf "${isolated_repo}/skills/${drive_relative_pollution_target}"
+  fi
+  assert_sources_intact "『target 是 Windows drive-relative 路徑』"
+
+  # 情境 14：確認修正沒有連帶弱化既有保護——"C:"（drive letter 後面直接結尾，沒有
+  # 任何路徑內容）本來就該被既有的 bare drive-root 檢查擋下（正規化後就是 "/c"），
+  # 不屬於這次新增的 drive-relative 拒絕範圍，必須繼續維持安全拒絕。
+  if output="$(bash "${isolated_repo}/scripts/install.sh" "C:" 2>&1)"; then
+    echo "FAIL: install.sh 對 target='C:' 應該失敗，但卻成功了"
+    fail=1
+  else
+    if ! echo "${output}" | grep -qi "drive root"; then
+      echo "FAIL: install.sh 對 target='C:' 的錯誤訊息不符預期（應仍歸類為 drive root，不應變成別的分類或被放行）"
+      echo "  實際輸出: ${output}"
+      fail=1
+    fi
+  fi
+  assert_sources_intact "『target 是單獨的 C:』"
+else
+  echo "SKIP: 目前環境不是 Windows/Git Bash（MSYS），跳過情境 13-14（Windows drive-relative 路徑語意只在該環境下有意義）"
+fi
+
+# 情境 15：反向情境——只在「非」MSYS 環境下有意義。驗證情境 13 新增的
+# drive-relative 拒絕沒有誤傷非 Windows 平台：一個字面上長得像 Windows
+# drive-relative 路徑的字串（例如 "C:foo"）在真正的 POSIX 檔案系統上就只是一個
+# 含冒號的普通相對檔名，不該被誤判拒絕。
+#
+# 修正（PR34-CX-6，Codex 獨立審查發現）：先前用 `|| true` 吞掉 exit code、只檢查
+# 輸出文字沒有出現 drive-relative/drive root 關鍵字，這樣如果 install.sh 因為
+# 其他無關原因失敗（例如某個非預期的 bug），只要錯誤訊息剛好沒提到這兩個關鍵字，
+# 測試依然會回報綠燈——沒有真正驗證「install.sh 有沒有成功完成安裝」這件事本身。
+# 改為明確要求 exit code 必須是 0，且目標目錄底下兩個技能的 SKILL.md 都要實際
+# 存在，才算通過；失敗時完整印出實際輸出，不吞掉任何錯誤細節。
+if [ "${is_msys}" -ne 1 ]; then
+  literal_colon_target="${tmp_dir}/literal-colon-target"
+  mkdir -p "${literal_colon_target}"
+  literal_colon_output="$(cd "${literal_colon_target}" && bash "${isolated_repo}/scripts/install.sh" "C:foo-literal" 2>&1)"
+  literal_colon_exit=$?
+  if [ "${literal_colon_exit}" -ne 0 ]; then
+    echo "FAIL: 非 MSYS 環境下，install.sh 對字面上的 'C:foo-literal' 應該成功安裝，卻回報失敗（exit code ${literal_colon_exit}）"
+    echo "  實際輸出: ${literal_colon_output}"
+    fail=1
+  elif [ ! -f "${literal_colon_target}/C:foo-literal/wmux-best-practice/SKILL.md" ] || [ ! -f "${literal_colon_target}/C:foo-literal/wmux-coordinator/SKILL.md" ]; then
+    echo "FAIL: 非 MSYS 環境下，install.sh 對字面上的 'C:foo-literal' 回報成功（exit 0），但目標目錄底下沒有完整安裝兩個技能的 SKILL.md"
+    echo "  實際輸出: ${literal_colon_output}"
+    fail=1
+  fi
+  assert_sources_intact "『非 MSYS 環境下 target 字面上長得像 drive-relative 路徑』"
+  rm -rf "${literal_colon_target}"
+else
+  echo "SKIP: 目前環境是 Windows/Git Bash（MSYS），跳過情境 15（驗證非 MSYS 平台不被 drive-relative 拒絕誤傷，只在非 MSYS 平台下有意義）"
+fi
+
 if [ "${fail}" -eq 0 ]; then
   echo "PASS: 安裝腳本負向測試通過"
 fi
