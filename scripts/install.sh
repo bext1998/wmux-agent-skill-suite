@@ -44,6 +44,25 @@ case "$(uname -s 2>/dev/null)" in
   MINGW*|MSYS*|CYGWIN*) is_msys=1 ;;
 esac
 
+# 只在 MSYS 拒絕 Windows drive-relative 路徑（drive letter 後面接的不是 / 或 \，
+# 例如 "C:foo"、"C:."——在 Windows 路徑語意裡這代表「相對於 C: 磁碟機當下的工作
+# 目錄」，不等於 "C:/foo" 這種 drive-絕對路徑）。這裡刻意不比照 "C:/foo" 那樣猜測
+# 正規化成 "/c/foo"：`realpath -m` 對 "C:foo" 會回傳 "C:/foo"（幫它腦補了一個
+# 斜線，等同誤判成 drive-絕對路徑），但實際負責建立目錄的 `mkdir`/`cd` 收到的是
+# 原始字串 "C:foo"，MSYS 並不理解 Windows drive 語意，會把它當成 CWD-relative、
+# 字面上含冒號的普通檔名處理——也就是說，邊界檢查驗證的位置（/c/foo）跟 mkdir
+# 實際動作的位置（CWD 底下的 C:foo）完全對不上，讓邊界檢查形同虛設。實測重現過：
+# 在 CWD 恰好是技能來源目錄本身的情況下，這會先把一個叫 "C:foo" 的目錄建到來源
+# 目錄裡面（污染），雖然第二次檢查最終還是會抓到、讓整體安裝失敗，但污染已經
+# 發生。與其嘗試比照 Windows 自己去解析「這個磁碟機當下的工作目錄是什麼」（bash
+# 沒有可靠、可攜的方式知道這件事），更安全的作法是直接拒絕這種輸入，不做任何猜測。
+# "C:"（drive letter 後面直接結尾，沒有任何內容）不受這個檢查影響——正規化後就是
+# bare drive root "/c"，已經由下面 check_target_boundaries 的既有邏輯處理。
+if [ "${is_msys}" -eq 1 ] && [[ "${target_root}" =~ ^[A-Za-z]:[^/\\] ]]; then
+  echo "錯誤: 目標路徑 '${target_root}' 是 Windows drive-relative 路徑（drive letter 後面不是 / 或 \\），它的實際位置取決於該磁碟機當下的工作目錄，本腳本無法安全預先驗證，拒絕安裝。請改用帶斜線的絕對路徑（例如 '${target_root:0:2}/...'）。" >&2
+  exit 1
+fi
+
 script_dir="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 repo_root="$(cd -P "${script_dir}/.." && pwd -P)"
 
@@ -173,8 +192,20 @@ if ! check_target_boundaries "${hypothetical_root}"; then
   exit 1
 fi
 
-mkdir -p "${target_root}"
-resolved_root="$(to_msys_form "$(cd -P "${target_root}" && pwd -P)")"
+# mkdir/cd 一律用上面已經正規化、驗證過的絕對路徑 hypothetical_root，並加上 `--`
+# 明確終止選項解析——不要再把使用者原始輸入的 target_root 字串直接傳給 mkdir/cd。
+# 實測重現過用 target_root 的具體危害：(a) target_root="-" 時，`cd -P "${target_root}"`
+# 沒有 `--` 會被 Bash 當成特殊語法 `cd -`，不會 cd 進剛用 mkdir 建出來的 "-" 目錄，
+# 而是跳到 $OLDPWD，還把 `cd -` 印出的新目錄那行一併被 command substitution 吃進
+# resolved_root，讓它變成無意義的兩行字串；(b) target_root 是 Windows
+# drive-relative 路徑（如 "C:foo"）時，`realpath -m` 把它正規化成 drive-絕對路徑
+# 去做安全檢查，但 mkdir/cd 收到的原始字串卻被當成 CWD-relative 的普通檔名，兩者
+# 對不上，等於安全檢查驗證的位置跟實際動作的位置是兩回事（另外已在上面用明確拒絕
+# 這類輸入的方式處理，這裡的 `--` 是同一類「原始字串繞過正規化」問題的通用防線，
+# 不只是為了那一個案例）。改用 hypothetical_root 之後，mkdir/cd 動作的位置保證
+# 跟已經驗證過的位置完全一致，不會有另一個字串解讀方式偷偷生效的空間。
+mkdir -p -- "${hypothetical_root}"
+resolved_root="$(to_msys_form "$(cd -P -- "${hypothetical_root}" && pwd -P)")"
 
 # mkdir -p 之後路徑確實存在了，用 cd -P/pwd -P 重新解析一次做最終確認：防禦性地
 # 不假設上面對 hypothetical_root 的檢查已經涵蓋所有情況（例如 target_root 內含
