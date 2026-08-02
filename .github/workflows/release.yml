@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run static validation suite
+        run: bash tests/run-all.sh
+
+      # 打包內容只放使用者實際需要的「可直接安裝」的東西：兩個技能本體、通用安裝
+      # 腳本，以及安裝/遷移說明、README、LICENSE。不含 tests/、node_modules/、CI
+      # 設定等開發用內容——這些對只是想裝技能的使用者沒有意義，也避免打包進 CI
+      # secrets 或開發環境殘留檔案。
+      - name: Build release archive
+        run: |
+          archive_name="wmux-agent-skill-suite-${GITHUB_REF_NAME}.zip"
+          zip -r "${archive_name}" \
+            skills \
+            scripts/install.sh \
+            docs/install.md \
+            docs/migration.md \
+            README.md \
+            LICENSE
+
+      # 若對應版本有預先寫好的 release notes（見 docs/release-notes/），優先使用；
+      # 沒有的話（例如非計畫內的 patch tag）退回 --generate-notes 自動產生，避免
+      # release 因為缺一份手寫檔案就失敗。
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          archive_name="wmux-agent-skill-suite-${GITHUB_REF_NAME}.zip"
+          notes_file="docs/release-notes/${GITHUB_REF_NAME}.md"
+          if [ -f "${notes_file}" ]; then
+            gh release create "${GITHUB_REF_NAME}" \
+              "${archive_name}" \
+              --title "${GITHUB_REF_NAME}" \
+              --notes-file "${notes_file}"
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              "${archive_name}" \
+              --title "${GITHUB_REF_NAME}" \
+              --generate-notes
+          fi

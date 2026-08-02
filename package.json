@@ -1,7 +1,8 @@
 {
   "name": "wmux-agent-skill-suite",
+  "version": "0.0.1",
   "private": true,
-  "description": "驗證用工具鏈依賴（tests/lib 下的 YAML frontmatter 解析器），非發佈用套件。",
+  "description": "驗證用工具鏈依賴（tests/lib 下的 YAML frontmatter 解析器），非發佈用套件；version 欄位僅用於跟 repository 的 Git tag/Release 版本號同步，不代表這是一個要發佈到 npm registry 的套件。",
   "engines": {
     "node": ">=24"
   },
