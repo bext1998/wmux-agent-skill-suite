@@ -92,9 +92,13 @@ BLOCKED#<id>: 一句話說明卡在什麼決策或資訊上
 
 其他 harness（例如 opencode、其他 Claude Code pane）尚未實測，套用前比照上表方法：先用一次性測試任務、並在任務進行中高頻輪詢（不要只等任務結束後才看一次），觀察忙碌指標與完成標記的實際呈現，再正式納入派工流程；不要直接假設會跟上表兩種 harness 行為一致，也不要只憑歷史畫面裡的文字推論忙碌指標——上面兩個更正就是這麼犯錯的。
 
-## 版本重新驗證紀錄（v0.41.0）
+## 版本重新驗證紀錄（v0.38.0）
 
-本技能遷移至獨立 repository 時（2026-08-02），與 `../wmux-best-practice/SKILL.md` 同步以 wmux 官方最新正式版重新核對：`v0.41.0`（annotated tag SHA `60127c5d37ec9d24ae6640cac1f5793a20e76ac6`，commit `390aa5beef1c9dfc07ebe02db3db3c8229462260`，`platform win32`，capabilities `protocols: ["v1","v2"]`／`features: ["workspaces","splits","notifications"]`，與先前版本一致）。CLI 說明列出的新指令家族 `report-agent`／`answer-agent`／`report-metadata`／`report-session`／`release-agent`／`agent-state` 與「agent 回報自身狀態、blocked 回覆」相關，**理論上可以取代或補強上面「派工→核對→提交→輪詢」流程裡靠 `read-screen` 輪詢文字標記的作法**（例如用 `answer-agent` 直接回覆而不必離開自己的 pane），但本次遷移未對它們做任何跨 pane 實測，因此本文件的派工流程與升級規則暫不採用它們，維持原本以 `send`/`read-screen` 輪詢單行標記的既有做法作為唯一已驗證路徑。若未來要導入，需先比照「Per-harness 適配層」的方法，對真實 pane 高頻輪詢驗證行為後才能正式納入流程，並在此段落更新結果。
+本技能遷移至獨立 repository 時，最初與 `../wmux-best-practice/SKILL.md` 同步以當時 wmux 官方最新正式版 v0.41.0 重新核對；使用者於實際使用中回報 v0.41.0 有嚴重效能問題，因此本機降版至 v0.38.0，本段落改以 v0.38.0 作為本次遷移的實際適配與驗證基準：`v0.38.0`（annotated tag SHA `60dd5e51e1ccf269b3d59290f33b985a79763837`，commit `7882751c57da360635d22c36ff13f6294af27796`，`platform win32`，capabilities `protocols: ["v1","v2"]`／`features: ["workspaces","splits","notifications"]`，與先前版本一致）。
+
+本次實際重跑並確認的項目：`wmux identify`、`wmux capabilities`、`wmux`（完整指令說明列表）；未重跑、沿用既有記錄的項目：上面「Per-harness 適配層」表格內對 Codex／Pi 的即時互動實測（忙碌畫面、完成標記、輸入框呈現），本次未重新對真實 pane 執行，仍以既有記錄為準，不視為已針對 0.38.0 重新驗證。
+
+`../wmux-best-practice/SKILL.md` 的版本重新驗證紀錄已確認：`report-agent`／`answer-agent`／`report-metadata`／`report-session`／`release-agent`／`agent-state` 這組與「agent 回報自身狀態、blocked 回覆」相關的 CLI 表面，**只在 v0.41.0 觀察到，在本文件的驗證基準版本 v0.38.0 上不存在**。由於 v0.41.0 本身有使用者回報的嚴重效能問題、未採用為適配基準，這組指令目前不具備可用的驗證環境，本文件的派工流程與升級規則維持原本以 `send`/`read-screen` 輪詢單行標記的既有做法作為唯一已驗證路徑，不引用或假設這組指令可用。
 
 ## 邊界
 

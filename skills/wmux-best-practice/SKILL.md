@@ -17,33 +17,35 @@ description: 在 wmux（多視窗終端機）環境下操作其他 pane、跟另
 2. **env 不足時的唯讀 fallback**：`$WMUX`／`$WMUX_SURFACE_ID` 缺一或全無時，改呼叫唯讀指令 `wmux identify`（或 `wmux ping`）。成功回應 → 判定身處 wmux（例如巢狀 shell 未繼承 env 的情況），但沒有 `WMUX_SURFACE_ID` 可用時，需另外用 `tree`／`list-panes` 找出自己的 surface id 才能繼續。失敗（非零 exit code 或錯誤）→ 判定不在 wmux 環境下。
 3. **env 可能過期時二次確認**：`$WMUX=1` 只代表這個 process 曾經繼承到該變數，不保證底層 pipe 目前仍存活。在依賴 env 判斷結果去執行任何非唯讀指令（可逆寫入／建立資源／破壞性操作）之前，先用 `identify` 或 `ping` 二次確認 pipe 仍然可用；只做唯讀查詢（如 `read-screen`）時可以省略這一步。
 4. **非 wmux 環境安靜退出**：判定不在 wmux 底下時，直接安靜跳過本技能其餘所有內容，不觸發、不嘗試任何其他 wmux 指令，也不需要向使用者報告「偵測失敗」這件事本身——除非使用者本來就是在問「這是不是 wmux 環境」。
-5. **版本漂移仍需重新驗證**：`identify`/`ping` 確認完「身處 wmux」只代表偵測本身成功，不代表下面「驗證環境與適用範圍」列出的具體行為結論（`--surface` 有效性、`close-pane` 是否真的關閉等）依然成立——版本不符時一律視同未驗證，套用下一節的重新確認方法。實測記錄：本文件行為基準最初建於 wmux 0.28.0，2026-07-29（win32）以 `wmux identify` 確認到 0.36.0 並重新核對過主要結論；本次遷移（2026-08-02，win32）再次以 `wmux identify`/`wmux capabilities` 現場確認版本為 **0.41.0**，`--surface`/`--pane` 定位限制、`ok: true` 不保證成功、`close-pane --surface` 無效等既有結論在本次核對中仍然成立。詳細版本紀錄見下方「版本重新驗證紀錄（v0.41.0）」。
+5. **版本漂移仍需重新驗證**：`identify`/`ping` 確認完「身處 wmux」只代表偵測本身成功，不代表下面「驗證環境與適用範圍」列出的具體行為結論（`--surface` 有效性、`close-pane` 是否真的關閉等）依然成立——版本不符時一律視同未驗證，套用下一節的重新確認方法。實測記錄：本文件行為基準最初建於 wmux 0.28.0，2026-07-29（win32）以 `wmux identify` 確認到 0.36.0 並重新核對過主要結論；本次遷移（2026-08-02，win32）再次以 `wmux identify`/`wmux capabilities` 現場確認版本為 **0.38.0**，`--surface`/`--pane` 定位限制、`ok: true` 不保證成功、`close-pane --surface` 無效等既有結論在本次核對中仍然成立。詳細版本紀錄見下方「版本重新驗證紀錄（v0.38.0）」。
 
 ## 驗證環境與適用範圍
 
-以下所有具體行為結論（哪個旗標有效、預設會落在哪個 pane 等）都在下列環境中實測驗證過：`wmux identify` 回報 `version 0.28.0`／`0.36.0`／`0.41.0`（多次重新核對，見下方版本紀錄），`platform win32`；`wmux capabilities` 回報 `protocols: ["v1","v2"]`、`features: ["workspaces","splits","notifications"]`。**這些是特定版本下實測觀察到的行為，不是保證不變的 API 契約。** 在不同版本、不同平台（例如 macOS/Linux）或回報不同 protocol/feature 的 wmux instance 上，行為可能不同——換到新環境前，先用 `identify`／`capabilities` 核對版本與能力，若版本不同就視同未驗證，用本文件的判斷方法（呼叫前後用唯讀指令核對）重新確認一次，不要直接套用下面列出的具體結論。
+以下所有具體行為結論（哪個旗標有效、預設會落在哪個 pane 等）都在下列環境中實測驗證過：`wmux identify` 回報 `version 0.28.0`／`0.36.0`／`0.38.0`（多次重新核對，見下方版本紀錄），`platform win32`；`wmux capabilities` 回報 `protocols: ["v1","v2"]`、`features: ["workspaces","splits","notifications"]`。**這些是特定版本下實測觀察到的行為，不是保證不變的 API 契約。** 在不同版本、不同平台（例如 macOS/Linux）或回報不同 protocol/feature 的 wmux instance 上，行為可能不同——換到新環境前，先用 `identify`／`capabilities` 核對版本與能力，若版本不同就視同未驗證，用本文件的判斷方法（呼叫前後用唯讀指令核對）重新確認一次，不要直接套用下面列出的具體結論。
 
-### 版本重新驗證紀錄（v0.41.0）
+### 版本重新驗證紀錄（v0.38.0）
 
-本技能遷移至獨立 repository 時（2026-08-02），以當時 wmux 官方最新正式版重新核對：
+本技能遷移至獨立 repository 時，最初以當時 wmux 官方最新正式版 v0.41.0 重新核對；使用者於實際使用中回報 v0.41.0 有嚴重效能問題，因此本機降版至 v0.38.0，本段落改以 v0.38.0 作為本次遷移的實際適配與驗證基準：
 
-- **版本**：`v0.41.0`（annotated tag，tag object SHA `60127c5d37ec9d24ae6640cac1f5793a20e76ac6`，指向 commit `390aa5beef1c9dfc07ebe02db3db3c8229462260`）
+- **版本**：`v0.38.0`（annotated tag，tag object SHA `60dd5e51e1ccf269b3d59290f33b985a79763837`，指向 commit `7882751c57da360635d22c36ff13f6294af27796`）
 - **平台**：`win32`（`wmux identify` 現場確認）
 - **capabilities**：`protocols: ["v1","v2"]`，`features: ["workspaces","splits","notifications"]`（與先前版本一致，未觀察到新增/移除的 protocol 或 feature）
-- **既有結論重新核對**：本文件所有既有「唯讀/可逆寫入/建立資源/破壞性」分級、`--surface`/`--pane` 定位限制表、`ok: true` 不保證成功、pane-to-pane 交接流程，在 0.41.0 上重新讀過 `wmux <command> --help` 輸出後，指令名稱與旗標形狀未變，維持原判斷；但本次未逐項重新執行破壞性/建立資源類指令做即時互動驗證（該部分驗證仍以 2026-07-29 的 0.36.0 記錄為準），版本間差異視為低風險延續，非重新逐項實測。
-- **CLI 表面新增（未驗證，僅記錄存在）**：`wmux <command>` 說明列出以下在原始技能撰寫時未涵蓋的指令家族：`report-agent --blocked/--unblocked/--run-start/--run-end`、`answer-agent`、`report-metadata`、`report-session`、`release-agent`、`agent-state`。這組指令與「agent 回報自身狀態／blocked 回覆」有關，可能與 `wmux-coordinator` 的升級規則互補，但**本次遷移未對它們做任何互動實測**（沒有可靠環境可驗證多 agent 即時 blocked/answer 流程），因此下方內容不對它們的行為做任何保證，也不建議自動化流程依賴它們——若要使用，比照本文件方法先用唯讀指令核對，並在每次狀態變更後重新查驗證是否真的發生。
+- **本次實際重跑並確認的項目**：`wmux identify`、`wmux capabilities`、`wmux`（完整指令說明列表）、`wmux read-screen --surface <own-surface-id> --lines 5`（對自己所在 surface 唯讀查詢，回應格式與既有文件描述一致）。
+- **未重跑、沿用既有紀錄的項目**：破壞性／建立資源類指令（`split`、`close-pane`、`agent spawn`、`agent kill` 等）的即時互動驗證，以及跨 pane 的 `send`/`send-key` 交接流程，本次未重新執行——這部分行為結論仍沿用 2026-07-29 的 0.36.0 實機記錄，未在 0.38.0 上逐項重新驗證，不得視為已對 0.38.0 完成驗證。
+- **CLI 表面差異（已核對）**：0.38.0 的 `wmux` 指令說明列表**不包含** `report-agent`／`answer-agent`／`report-metadata`／`report-session`／`release-agent`／`agent-state` 這組指令家族——經比對確認這是 v0.41.0 才出現的新增 CLI 表面，在 0.38.0 上不存在，因此本文件不記錄、也不引用這組指令。
+- **v0.41.0 已知限制（不採用原因）**：使用者回報 v0.41.0 存在嚴重效能問題，具體症狀與根因未經本技能量測或診斷，僅記錄「使用者回報有嚴重效能問題」這個事實與「因此暫不採用 v0.41.0 作為適配基準」的決策，不對效能問題的量測數據或根因做任何未經查證的推測。
 
 ## 執行前的授權邊界：四類操作
 
 呼叫任何 wmux 指令前，先判斷它屬於哪一類，套用對應的謹慎程度。這四類跟後面「定位是否可靠」是不同維度，兩者都要顧到：
 
-**唯讀（可自由呼叫，沒有副作用）**：`identify`、`capabilities`、`ping`、`tree`、`list-panes`、`list-surfaces`、`list-windows`、`list-workspaces`、`list-notifications`、`read-screen`、`config show`／`config path`、`agent-state`（未驗證，見上方版本紀錄）。
+**唯讀（可自由呼叫，沒有副作用）**：`identify`、`capabilities`、`ping`、`tree`、`list-panes`、`list-surfaces`、`list-windows`、`list-workspaces`、`list-notifications`、`read-screen`、`config show`／`config path`。
 
 **可逆寫入（會改變某個既有 pane 的內容或產生可見狀態，但不會憑空消滅資源）**：`send`、`send-key`、`notify`。**目標 pane 與寫入內容都必須是使用者明確要求、或當下任務直接需要的**，不要自己延伸去操作使用者沒提到的 pane。`notify` 會產生使用者看得到的通知——這是真實、外顯的狀態變更，不是無害的背景查詢，呼叫前一樣要確認是使用者要的動作。
 
 **建立資源（會新增 pane、分頁或 process，佔用畫面與系統資源）**：`split`、`new-surface`、`agent spawn`。只在有明確任務需求時才呼叫（例如使用者要求開新工作區、或需要背景執行一個獨立任務），不要為了「探索指令行為」就隨意建立。
 
-**破壞性（會關閉或終止既有東西，且無法復原內容）**：`pane close`（verb form）、`close-surface`、`agent kill`、`release-agent`（未驗證，見上方版本紀錄，暫時比照破壞性等級處理）。**執行前必須確認：(a) 目標 ID 精確無誤——用 `tree`／`list-panes`／`agent list` 核對，不要憑記憶或猜測；(b) 這是使用者明確授權、或當下任務必要的動作。** 即使是「建立資源」類指令意外落在非預期的 pane 上，也不能自行判斷「這應該是空的、關掉沒差」就逕自呼叫破壞性指令清理——那個位置在你查證清楚之前，都可能已經有使用者原本的工作內容，落錯位置本身不構成關閉授權。正確做法：立刻用唯讀指令查清楚實際落在哪裡、目前內容是什麼，回報給使用者，取得明確授權後才清理，不要自作主張。
+**破壞性（會關閉或終止既有東西，且無法復原內容）**：`pane close`（verb form）、`close-surface`、`agent kill`。**執行前必須確認：(a) 目標 ID 精確無誤——用 `tree`／`list-panes`／`agent list` 核對，不要憑記憶或猜測；(b) 這是使用者明確授權、或當下任務必要的動作。** 即使是「建立資源」類指令意外落在非預期的 pane 上，也不能自行判斷「這應該是空的、關掉沒差」就逕自呼叫破壞性指令清理——那個位置在你查證清楚之前，都可能已經有使用者原本的工作內容，落錯位置本身不構成關閉授權。正確做法：立刻用唯讀指令查清楚實際落在哪裡、目前內容是什麼，回報給使用者，取得明確授權後才清理，不要自作主張。
 
 ## 核心原則：`ok: true` 不代表指令真的做到了
 
@@ -132,4 +134,4 @@ description: 在 wmux（多視窗終端機）環境下操作其他 pane、跟另
 - 不透過 `agent spawn` 或任何其他機制去附加、控制一個已經在互動運行的既有 pane——那不是這組指令的設計用途。
 - 不呼叫 `token`、不執行 `hook --event`、不呼叫 `ssh`/`bridge`——這些不在本技能範圍內。
 - 對其他 pane 送出文字前，先 `read-screen` 確認狀態；送出後，在按 `send-key enter` 之前再 `read-screen` 一次確認內容正確落在目標 pane。
-- `report-agent`/`answer-agent`/`report-metadata`/`report-session`/`release-agent`/`agent-state` 這組指令目前僅記錄存在、未經本技能實測驗證，套用前比照「靜默環境偵測」的重新驗證方法，先用唯讀指令核對、每次狀態變更後重新查驗，不要假設它們的行為與說明文字完全一致。
+- `report-agent`/`answer-agent`/`report-metadata`/`report-session`/`release-agent`/`agent-state` 這組指令在本文件的驗證基準版本 v0.38.0 上不存在（見「版本重新驗證紀錄」的 CLI 表面差異），只在 v0.41.0 觀察到，本文件不採用，也不建議在未確認目標環境版本前假設它們可用。

@@ -35,7 +35,7 @@ bash scripts/install.sh ~/.claude/skills   # 或任何其他目標技能目錄
 
 ## 版本基準
 
-本 repository 建立時以 wmux 官方最新正式版本作為適配與驗證基準，記錄於各技能檔案的「版本重新驗證紀錄」段落與 [CHANGELOG.md](CHANGELOG.md)。
+本 repository 以一個經確認可正常使用的 wmux 正式版本作為適配與驗證基準，記錄於各技能檔案的「版本重新驗證紀錄」段落與 [CHANGELOG.md](CHANGELOG.md)。目前基準為 `v0.38.0`——建立時的最新正式版 `v0.41.0` 經使用者實際使用後回報有嚴重效能問題，因此未採用；`v0.41.0` 僅作為已知限制記錄，不是驗證基準。
 
 ## 授權
 

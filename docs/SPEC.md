@@ -6,7 +6,7 @@
   - `skills/wmux-best-practice`：單一 pane 對其他 pane 的基礎操作 primitive（讀畫面、送訊息、建立/清除 pane）。
   - `skills/wmux-coordinator`：建立在 `wmux-best-practice` 之上的 orchestrator 流程（Worker Registry、單行任務協議、派工/輪詢/升級規則、per-harness 適配層）。
 - 讓任何支援 `SKILL.md` 或相容技能格式的 coding agent（Claude Code、Codex、OpenCode、Pi 等）都能安裝並使用同一份技能內容，差異只落在安裝路徑與安裝方式。
-- 以本 repository 建立時 wmux 官方最新正式版本為基準做適配與驗證，並在版本紀錄中留存 tag／commit SHA／平台／capabilities。
+- 以一個經確認可正常使用的 wmux 正式版本為基準做適配與驗證，並在版本紀錄中留存 tag／commit SHA／平台／capabilities；若建立時的最新正式版本經使用者實際使用後回報有嚴重可用性問題（如效能），改以前一個可正常使用的正式版本為基準，並記錄放棄採用最新版本的原因（詳見 [CHANGELOG.md](../CHANGELOG.md)）。
 - 獨立於 [maze-coder](https://github.com/bext1998/maze-coder) 維護、測試、發布，不依賴其同步或發布流程。
 
 ## 非目標
@@ -31,7 +31,7 @@
 ## 相容性策略
 
 - **coding agent 中立**：核心技能內容（`skills/*/SKILL.md`）不得使用特定 coding agent 的 plugin API、hook、subagent 機制、模型名稱或固定安裝路徑；只依賴 wmux CLI 本身與一般 shell 能力。
-- **wmux 版本**：以建立本 repository 時的 wmux 最新正式版為驗證基準，記錄於各技能檔案內的「版本重新驗證紀錄」段落。版本落差時，技能內文的既有具體結論（旗標是否有效、預設落點等）應視為未驗證，需依技能內「靜默環境偵測」/「版本重新驗證」段落描述的方法重新核對，而不是直接信任舊紀錄。
+- **wmux 版本**：以一個經確認可正常使用的 wmux 正式版為驗證基準，記錄於各技能檔案內的「版本重新驗證紀錄」段落；被放棄採用的較新版本（例如已知有嚴重效能問題）只作為「已知限制／暫不採用原因」記錄，不作為驗證基準，也不得杜撰未實測的量測數據或根因。版本落差時，技能內文的既有具體結論（旗標是否有效、預設落點等）應視為未驗證，需依技能內「靜默環境偵測」/「版本重新驗證」段落描述的方法重新核對，而不是直接信任舊紀錄。
 - **平台**：目前的實測記錄皆基於 Windows（`win32`）。macOS/Linux 尚未實測，行為可能不同；使用前應先以唯讀指令（`identify`/`capabilities`）核對再決定是否套用既有結論。
 - **能力探測優先於硬編碼假設**：任何自動化流程在依賴某個 wmux 能力前，應先用 `capabilities`／`identify` 或前置的 `--help` 確認，並在能力不存在或版本不相容時提供安全 fallback（例如退回輪詢文字標記，而非假設新指令一定可用）。
 
