@@ -1,0 +1,11 @@
+{
+  "name": "wmux-agent-skill-suite",
+  "private": true,
+  "description": "驗證用工具鏈依賴（tests/lib 下的 YAML frontmatter 解析器），非發佈用套件。",
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "js-yaml": "4.3.1"
+  }
+}

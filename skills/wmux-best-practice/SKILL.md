@@ -17,11 +17,11 @@ description: 在 wmux（多視窗終端機）環境下操作其他 pane、跟另
 2. **env 不足時的唯讀 fallback**：`$WMUX`／`$WMUX_SURFACE_ID` 缺一或全無時，改呼叫唯讀指令 `wmux identify`（或 `wmux ping`）。成功回應 → 判定身處 wmux（例如巢狀 shell 未繼承 env 的情況），但沒有 `WMUX_SURFACE_ID` 可用時，需另外用 `tree`／`list-panes` 找出自己的 surface id 才能繼續。失敗（非零 exit code 或錯誤）→ 判定不在 wmux 環境下。
 3. **env 可能過期時二次確認**：`$WMUX=1` 只代表這個 process 曾經繼承到該變數，不保證底層 pipe 目前仍存活。在依賴 env 判斷結果去執行任何非唯讀指令（可逆寫入／建立資源／破壞性操作）之前，先用 `identify` 或 `ping` 二次確認 pipe 仍然可用；只做唯讀查詢（如 `read-screen`）時可以省略這一步。
 4. **非 wmux 環境安靜退出**：判定不在 wmux 底下時，直接安靜跳過本技能其餘所有內容，不觸發、不嘗試任何其他 wmux 指令，也不需要向使用者報告「偵測失敗」這件事本身——除非使用者本來就是在問「這是不是 wmux 環境」。
-5. **版本漂移仍需重新驗證**：`identify`/`ping` 確認完「身處 wmux」只代表偵測本身成功，不代表下面「驗證環境與適用範圍」列出的具體行為結論（`--surface` 有效性、`close-pane` 是否真的關閉等）依然成立——版本不符時一律視同未驗證，套用下一節的重新確認方法。實測記錄：本文件行為基準最初建於 wmux 0.28.0，2026-07-29（win32）以 `wmux identify` 確認到 0.36.0 並重新核對過主要結論；本次遷移（2026-08-02，win32）再次以 `wmux identify`/`wmux capabilities` 現場確認版本為 **0.38.0**，`--surface`/`--pane` 定位限制、`ok: true` 不保證成功、`close-pane --surface` 無效等既有結論在本次核對中仍然成立。詳細版本紀錄見下方「版本重新驗證紀錄（v0.38.0）」。
+5. **版本漂移仍需重新驗證**：`identify`/`ping` 確認完「身處 wmux」只代表偵測本身成功，不代表下面「驗證環境與適用範圍」列出的具體行為結論（`--surface` 有效性、`close-pane` 是否真的關閉等）依然成立——版本不符時一律視同未驗證，套用下一節的重新確認方法。實測記錄：本文件行為基準最初建於 wmux 0.28.0，2026-07-29（win32）以 `wmux identify` 確認到 0.36.0 並重新核對過主要結論；本次遷移（2026-08-02，win32）再次以 `wmux identify`/`wmux capabilities` 現場確認版本為 **0.38.0**，但本次只重跑了 `identify`/`capabilities`/`wmux`（指令說明列表）/自身 `read-screen`，`--surface`/`--pane` 定位限制、`ok: true` 不保證成功、`close-pane --surface` 無效等既有結論**沿用 0.36.0 的實機紀錄，本次未在 0.38.0 上逐項重新驗證**。詳細範圍見下方「版本重新驗證紀錄（v0.38.0）」。
 
 ## 驗證環境與適用範圍
 
-以下所有具體行為結論（哪個旗標有效、預設會落在哪個 pane 等）都在下列環境中實測驗證過：`wmux identify` 回報 `version 0.28.0`／`0.36.0`／`0.38.0`（多次重新核對，見下方版本紀錄），`platform win32`；`wmux capabilities` 回報 `protocols: ["v1","v2"]`、`features: ["workspaces","splits","notifications"]`。**這些是特定版本下實測觀察到的行為，不是保證不變的 API 契約。** 在不同版本、不同平台（例如 macOS/Linux）或回報不同 protocol/feature 的 wmux instance 上，行為可能不同——換到新環境前，先用 `identify`／`capabilities` 核對版本與能力，若版本不同就視同未驗證，用本文件的判斷方法（呼叫前後用唯讀指令核對）重新確認一次，不要直接套用下面列出的具體結論。
+以下所有具體行為結論（哪個旗標有效、預設會落在哪個 pane 等）的實機驗證基準是 `wmux identify` 回報 `version 0.28.0`／`0.36.0`，`platform win32`；`wmux capabilities` 回報 `protocols: ["v1","v2"]`、`features: ["workspaces","splits","notifications"]`。`0.38.0` 現場確認過版本號、capabilities 與 `identify`/`capabilities`/`wmux`（指令說明列表）/自身 `read-screen` 這幾項，但**未逐項重新驗證**其餘具體結論（詳見下方「版本重新驗證紀錄（v0.38.0）」），因此上述行為結論目前仍以 0.36.0 的實機紀錄為準。**這些是特定版本下實測觀察到的行為，不是保證不變的 API 契約。** 在不同版本、不同平台（例如 macOS/Linux）或回報不同 protocol/feature 的 wmux instance 上，行為可能不同——換到新環境前，先用 `identify`／`capabilities` 核對版本與能力，若版本不同就視同未驗證，用本文件的判斷方法（呼叫前後用唯讀指令核對）重新確認一次，不要直接套用下面列出的具體結論。
 
 ### 版本重新驗證紀錄（v0.38.0）
 
