@@ -1,0 +1,30 @@
+# 測試方式
+
+## 1. 靜態 CI 驗證（GitHub Actions，任何平台可跑）
+
+由 `.github/workflows/ci.yml` 執行，觸發時機：對 `main` 的 Pull Request、push 到 `main`。驗證項目對應 `tests/` 下的腳本：
+
+- `tests/validate-frontmatter.sh`：每個 `skills/*/SKILL.md` 都有合法 YAML frontmatter，且 `name` 欄位與所在資料夾名稱一致。
+- `tests/validate-structure.sh`：必要檔案存在（`README.md`、`LICENSE`、`CHANGELOG.md`、`AGENTS.md`、`CLAUDE.md`、`docs/SPEC.md`、兩個技能的 `SKILL.md`）；資料夾名稱正確（`skills/wmux-best-practice`、`skills/wmux-coordinator`）。
+- `tests/validate-references.sh`：`wmux-coordinator/SKILL.md` 內對 `wmux-best-practice` 的相對引用路徑真實存在，且不存在任何指向 `../wmux/` 舊路徑的殘留引用。
+- `tests/validate-no-legacy-names.sh`：全 repo 範圍內不存在舊名稱 `wmux-orchestrator`（作為技能名稱/資料夾名，不含本說明文件、CHANGELOG 內對歷史更名的必要說明）、舊安裝路徑範例，以及 `maze-*` 技能前綴殘留。
+- `tests/validate-install-script.sh`：`scripts/install.sh` 可將兩個技能安裝到一個臨時目錄，且安裝後檔案內容與 `skills/` 來源一致。
+
+本機執行（POSIX shell / Git Bash）：
+
+```bash
+bash tests/run-all.sh
+```
+
+Windows 原生 PowerShell 環境無法直接跑上述 Bash 驗證時，改以 GitHub Actions 的執行結果為準；不建議在 PowerShell 下另外維護一份等效腳本（避免兩份驗證邏輯漂移）。
+
+## 2. Windows wmux 實機驗證（手動，CI 不跑）
+
+CI 只做靜態內容檢查，不會真的啟動 wmux 或操作 pane。任何會改變技能「行為結論」的修訂（旗標是否有效、忙碌/完成畫面呈現、per-harness 適配層等），都需要在真實 Windows + wmux 環境下手動驗證：
+
+1. 確認本機 wmux 版本：`wmux identify` / `wmux capabilities`。
+2. 依技能文件描述的流程，對真實 pane 執行對應指令，觀察實際回應與畫面呈現。
+3. 將版本、tag/commit SHA、平台、capabilities 與觀察結果，記錄進對應技能檔案的「版本重新驗證紀錄」段落。
+4. 若觀察結果與既有文件描述不一致，比照 `wmux-coordinator` 既有的「重要更正」寫法處理，不覆蓋、不刪除舊紀錄的脈絡。
+
+這一步無法在 GitHub Actions 的 Linux/hosted runner 上執行（沒有 wmux 環境與互動 pane），因此不是 CI 的一部分；PR 描述應明確註明是否完成了這一步、或本次修訂不涉及行為結論變動。
