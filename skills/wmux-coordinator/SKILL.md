@@ -100,6 +100,10 @@ BLOCKED#<id>: 一句話說明卡在什麼決策或資訊上
 
 `../wmux-best-practice/SKILL.md` 的版本重新驗證紀錄已確認：`report-agent`／`answer-agent`／`report-metadata`／`report-session`／`release-agent`／`agent-state` 這組與「agent 回報自身狀態、blocked 回覆」相關的 CLI 表面，**只在 v0.41.0 觀察到，在本文件的驗證基準版本 v0.38.0 上不存在**。由於 v0.41.0 本身有使用者回報的嚴重效能問題、未採用為適配基準，這組指令目前不具備可用的驗證環境，本文件的派工流程與升級規則維持原本以 `send`/`read-screen` 輪詢單行標記的既有做法作為唯一已驗證路徑，不引用或假設這組指令可用。
 
+### v0.0.1 發布前補充（2026-08-02）
+
+依 `../wmux-best-practice/SKILL.md` 對 upstream v0.39.0–v0.41.0 官方 Release Notes 的調查（純文件調查，非本機實測，詳見該檔案對應段落）：`answer-agent`（v0.41.0 新增）理論上可以讓 orchestrator 不必切換到目標 pane、直接對一個已宣告 `blocked` 且帶 `--choices` 的 agent 送出回覆，可能可以取代或補強上面「派工→核對→提交→輪詢」流程裡靠 `read-screen` 輪詢文字標記判斷 `BLOCKED#<id>` 的做法。但 upstream 官方文件明確聲明 **Claude Code 目前無法宣告 `--choices`**（只會傳出「需要你」訊號，不帶結構化選項資料），所以就算未來採用 v0.41.0，對 Claude Code worker 而言也不會有實際差異；只有主動採用這個宣告協議的 harness（可能包含 Codex、Pi，但兩者是否已支援未經查證，只是 upstream 文件沒有點名排除）才可能受益。這組指令在 v0.38.0 上不存在、v0.41.0 因效能問題未安裝，本文件的升級規則暫不採用，維持既有 `send`/`read-screen` 做法。
+
 ## 邊界
 
 - 授權邊界、`send`/`read-screen` 核對流程、`--surface` 定位限制、`ok: true` 不代表成功等結論，一律引用 `../wmux-best-practice/SKILL.md`，不在本文件複製或另立一份，避免兩份文件漂移。

@@ -35,6 +35,20 @@ description: 在 wmux（多視窗終端機）環境下操作其他 pane、跟另
 - **CLI 表面差異（已核對）**：0.38.0 的 `wmux` 指令說明列表**不包含** `report-agent`／`answer-agent`／`report-metadata`／`report-session`／`release-agent`／`agent-state` 這組指令家族——經比對確認這是 v0.41.0 才出現的新增 CLI 表面，在 0.38.0 上不存在，因此本文件不記錄、也不引用這組指令。
 - **v0.41.0 已知限制（不採用原因）**：使用者回報 v0.41.0 存在嚴重效能問題，具體症狀與根因未經本技能量測或診斷，僅記錄「使用者回報有嚴重效能問題」這個事實與「因此暫不採用 v0.41.0 作為適配基準」的決策，不對效能問題的量測數據或根因做任何未經查證的推測。
 
+### v0.0.1 發布前差異調查（2026-08-02，補充）
+
+發布前重新確認 upstream 是否有新版本、以及 v0.38.0 與 v0.41.0 之間的實際差異範圍，方法與結論如下：
+
+- **本機版本現場再確認**：`wmux identify` 回報仍是 `version 0.38.0`、`platform win32`；`wmux capabilities` 回報仍是 `protocols: ["v1","v2"]`、`features: ["workspaces","splits","notifications"]`，與先前紀錄一致，未升級、未重裝（依規則不得為了驗證而自行升級到已知有效能問題的 v0.41.0）。另外現場直接呼叫 `wmux agent-state`（唯讀查詢，無副作用）驗證，回報 `Unknown command: agent-state`、exit code 1——這是本輪對「v0.38.0 沒有 agent-state 家族」這個既有結論的直接重新實測，不只是重讀 `wmux` 指令列表的間接推論。
+- **upstream 最新版本確認**：透過 GitHub Releases API 查詢，最新正式版仍是 `v0.41.0`（未有更新版本發布），故本文件既有的 v0.38.0/v0.41.0 版本紀錄不需要再往後追一個版本。
+- **差異範圍**：`git compare v0.38.0...v0.41.0` 顯示 30 個 commit，對應 upstream 官方 v0.39.0、v0.39.1、v0.40.0、v0.41.0 四份 Release Notes（來源：https://github.com/amirlehmam/wmux/releases）。**以下內容全部只來自閱讀 upstream 官方 Release Notes，未在本機互動實測，因為 v0.38.0 上這組指令根本不存在、v0.41.0 因效能問題未安裝——這是文件調查，不是行為驗證，不能升級成「已驗證」：**
+  - `v0.39.0`：新增 agent-state 模組與整組 CLI／V2 pipe method（`report-agent`、`report-metadata`、`report-session`、`release-agent`、`agent-state`；`pane.report_agent`、`pane.report_agent_session`、`pane.report_metadata`、`pane.release_agent`、`pane.agent_state`），讓 agent 主動宣告自己是 `blocked`／`working`／`idle`，取代舊版用 5 秒逾時猜測忙碌狀態的方式。同版修掉一個無關的通知 spam bug（OSC 9 誤判）。
+  - `v0.39.1`：修 agent-state 在 PTY 結束時的殘影（ghost pane）清理 bug，跟本技能既有內容無關。
+  - `v0.40.0`：新增對 `~/.claude`／`~/.claude.md`／`settings.json` 等檔案寫入前的使用者同意流程（首次啟動詢問 Enable／Not now／Never，拒絕會清除先前寫入的內容）、修一個非 git 目錄開 diff pane 會讓主行程卡死的 bug、修 saved session 沒有分別記住每個分頁自己的工作目錄的 bug、修 titlebar 用到舊版 icon 的 bug，以及完整的 renderer i18n。皆跟本技能既有內容無直接關係。
+  - `v0.41.0`：新增 `answer-agent` CLI 與 `pane.answer_agent` V2 method，讓使用者可以在不切換到目標 pane 的情況下，直接回覆一個已宣告 `blocked` 且帶有 `--choices`（`id`／`label`／`key` 或 `text`）的 agent；`wmux` 會把宣告的按鍵/文字送進該 pane。**upstream release notes 明確聲明：Claude Code 目前無法宣告 `--choices`**（Claude Code 的 hook 只會回報「需要你」，不帶結構化選項資料），所以對 Claude Code pane 而言，即使裝 v0.41.0，也只會看到跟 v0.39.0 一樣的「Needs you」訊號、沒有可點的按鈕——只有主動採用這個宣告協議的 agent 才有按鈕可用。這點對 `wmux-coordinator` 的升級規則有參考價值（見 `wmux-coordinator/SKILL.md` 對應段落），但在 v0.38.0 上完全無法使用，也未實測。
+- **核心 primitive 差異**：`send`、`send-key`、`read-screen`、`tree`、`list-panes`、`split`、`close-pane`、`agent spawn` 等本文件既有記錄的核心指令，在上述四份 Release Notes 裡都沒有被提及有任何行為變更——這是「Release Notes 沒提到」的間接推論，不是逐項重新實測的直接證據，仍應視同「未變更但未重新驗證」，套用本文件既有的版本漂移處理方法。
+- **結論**：v0.38.0 作為本次 v0.0.1 發布的驗證基準持續有效；v0.41.0 除了已知效能問題外，新增的 `answer-agent`/`agent-state` 家族在 v0.38.0 上不存在也未實測，維持「已知限制、不採用、不宣稱已驗證」的既有立場。
+
 ## 執行前的授權邊界：四類操作
 
 呼叫任何 wmux 指令前，先判斷它屬於哪一類，套用對應的謹慎程度。這四類跟後面「定位是否可靠」是不同維度，兩者都要顧到：

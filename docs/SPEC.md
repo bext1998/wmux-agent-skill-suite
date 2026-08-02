@@ -53,7 +53,9 @@
 
 ## 發布流程
 
-- 版本號遵循語意化版本；首次發布為 `v0.0.1`。
+- 版本號遵循語意化版本；首次發布為 `v0.0.1`。**進位規則（見 Issue #31 維護者留言）**：從 `0.0.x` 開始時不套用一般「依變更規模決定進哪一位」的規則，一律只把第三位數字加一；直到第三位數字要進位到雙位數（即目前是 `0.0.9`，下一版會是 `0.0.10`）的那個時間點，才改用一般規則——由 PR 的 `release:major`／`release:minor`／`release:patch` label 決定進位到哪一位。
 - 發布前需完成：CHANGELOG 更新、CI 全綠、README/安裝文件與實際檔案結構一致。
-- Git tag 與 GitHub Release 由維護者在完成人工複審後建立，不在一般 PR 合併流程中自動觸發。
+- **一般 PR 合併不會自動建立 tag／Release**——只有維護者在合併前明確替 PR 貼上 `release:major`／`release:minor`／`release:patch` 三個 label 之一時，`.github/workflows/auto-tag-release.yml` 才會在合併後自動：重跑一次驗證（壞掉就不消耗版號）、依上述進位規則計算下一個版本號、建立並 push annotated tag、打包 `skills/`、`scripts/install.sh`、`docs/install.md`、`docs/migration.md`、`README.md`、`LICENSE` 成 zip、建立 GitHub Release。**貼 label 本身才是維護者的人工決策點**——沒有貼 label 的 PR 合併不會有任何 tag/Release 動作。
+- 直接手動 `git tag vX.Y.Z && git push origin vX.Y.Z` 也會觸發 `.github/workflows/release.yml`（只做驗證＋打包＋建立 Release，不做版本號計算），供需要手動控制版本號的情境使用。
+- 若版本號對應的 `docs/release-notes/vX.Y.Z.md` 存在，Release 會使用該檔案的內容當 release notes；不存在則退回 GitHub 依 commit 紀錄自動產生的說明（`--generate-notes`）。
 - Release notes 需列出：技能來源（遷移自 maze-coder 的 commit/PR）、重新命名對照、wmux 驗證版本與 tag/commit SHA、安裝方式、已知限制。
