@@ -267,7 +267,13 @@ if [ "${is_msys}" -ne 1 ]; then
     fail=1
   fi
 
-  case_diff_target="$(printf '%s' "${isolated_repo}/skills" | tr '[:lower:]' '[:upper:]')"
+  # 只把最後一段元件（"skills" -> "SKILLS"）轉大寫，父目錄（isolated_repo，已經
+  # 存在且可寫）維持原樣——不能對整個絕對路徑做 tr，那樣連 /tmp 這種系統層級、
+  # 不歸這個測試管、通常也沒有建立權限的路徑前綴都會被轉成 /TMP，導致 mkdir 因為
+  # 權限不足而失敗，跟「大小寫重疊誤判」這個真正要測的東西無關（已在 CI 的
+  # ubuntu-latest 上實際踩到這個問題：mkdir 因為 /TMP 沒有寫入權限而失敗，被誤判
+  # 成 install.sh 的邊界檢查有 bug）。
+  case_diff_target="$(dirname "${isolated_repo}/skills")/$(basename "${isolated_repo}/skills" | tr '[:lower:]' '[:upper:]')"
   if [ "${case_diff_target}" != "${isolated_repo}/skills" ]; then
     if ! case_diff_output="$(bash "${isolated_repo}/scripts/install.sh" "${case_diff_target}" 2>&1)"; then
       echo "FAIL: 非 MSYS（大小寫敏感）環境下，install.sh 把跟 skills_src 只有大小寫不同、實際是不同目錄的 target 誤判成重疊而拒絕"
