@@ -4,7 +4,9 @@
 
 ## [Unreleased]
 
-（尚無項目）
+### Added
+
+- 追蹤 upstream wmux `v0.42.0`（2026-08-03 發布，[release notes](https://github.com/amirlehmam/wmux/releases/tag/v0.42.0)）的已知資訊（issue #8）：該版本修好了造成本專案放棄 `v0.41.0`、改採 `v0.38.0` 的兩個嚴重效能問題（diff pane 輪詢失控狂噴 `git.exe`、crash 後 process 樹殘留），以及 `wmux tree --workspace`／`list-surfaces --workspace`/`--pane` 旗標修復、V2 指令全面攜帶 `WMUX_SURFACE_ID` 這兩項 CLI 表面異動。內容全部來自比對官方 release notes 與對應 commit，**未進行 Windows wmux 實機驗證**，因此本次不變更「版本重新驗證紀錄」或版本基準（維持 `v0.38.0`），也不宣稱已對 `v0.42.0` 完成適配。詳見兩個技能檔案內新增的「v0.42.0 已知資訊」段落與 [README.md](README.md#版本基準)。後續若要正式將驗證基準升級到 `v0.42.0`，需要另外完成 `docs/testing.md` 第 2 節描述的實機驗證流程。
 
 ## [0.0.1] - 2026-08-02
 

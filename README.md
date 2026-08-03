@@ -37,6 +37,8 @@ bash scripts/install.sh ~/.claude/skills   # 或任何其他目標技能目錄
 
 本 repository 以一個經確認可正常使用的 wmux 正式版本作為適配與驗證基準，記錄於各技能檔案的「版本重新驗證紀錄」段落與 [CHANGELOG.md](CHANGELOG.md)。目前基準為 `v0.38.0`——建立時的最新正式版 `v0.41.0` 經使用者實際使用後回報有嚴重效能問題，因此未採用；`v0.41.0` 僅作為已知限制記錄，不是驗證基準。
 
+`v0.42.0`（2026-08-03 發布）的官方 release notes 顯示已修好造成 `v0.41.0` 被放棄的那兩個效能問題，是未來升級驗證基準的候選版本；兩個技能檔案已各自新增「v0.42.0 已知資訊」段落，內容僅來自 release notes／commit diff 比對，**尚未完成 Windows wmux 實機驗證**，因此目前驗證基準仍維持 `v0.38.0` 不變。
+
 ## 授權
 
 [MIT License](LICENSE)

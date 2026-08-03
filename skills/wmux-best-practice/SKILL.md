@@ -49,6 +49,15 @@ description: 在 wmux（多視窗終端機）環境下操作其他 pane、跟另
 - **核心 primitive 差異**：`send`、`send-key`、`read-screen`、`tree`、`list-panes`、`split`、`close-pane`、`agent spawn` 等本文件既有記錄的核心指令，在上述四份 Release Notes 裡都沒有被提及有任何行為變更——這是「Release Notes 沒提到」的間接推論，不是逐項重新實測的直接證據，仍應視同「未變更但未重新驗證」，套用本文件既有的版本漂移處理方法。
 - **結論**：v0.38.0 作為本次 v0.0.1 發布的驗證基準持續有效；v0.41.0 除了已知效能問題外，新增的 `answer-agent`/`agent-state` 家族在 v0.38.0 上不存在也未實測，維持「已知限制、不採用、不宣稱已驗證」的既有立場。
 
+### v0.42.0 已知資訊（僅來自官方 release notes／commit diff，尚未實機驗證）
+
+2026-08-03 發布的 `v0.42.0`（[release notes](https://github.com/amirlehmam/wmux/releases/tag/v0.42.0)）明確修復了促使本文件當初放棄 v0.41.0、改採 v0.38.0 的那兩個嚴重效能問題（對應 upstream issue #141、#139）。以下內容全部來自比對官方 release notes 與對應 commit（`8954e793bdb29c2df3325f7580372c99c922a349`、`8807caab6b25c81d5c71d0df4a39ef38b5751a48`、`64b2db877dd8ddfd3ad965c5fc9db2d3bec92dbf`）的 diff，**不是**本技能在真實 Windows wmux 環境下重跑 `identify`/`capabilities`/互動流程得到的結果——依「靜默環境偵測」第 5 點與本文件既有的版本漂移處理方法，這類結論一律視為未驗證，不得當作已確認的行為結論使用，也**不改變**本文件目前以 v0.38.0 為準的既有結論與版本基準：
+
+- **`--workspace`／`--pane` 旗標修好了**：`wmux tree --workspace <id>` 先前會解析旗標但直接丟棄、永遠回報目前作用中的 workspace；`list-surfaces --workspace <id>` 同樣忽略該旗標，`--pane` 也從未套用。commit diff（`src/cli/wmux.ts`）顯示這兩個指令現在會把旗標真正帶進 RPC 呼叫。本文件目前未記錄任何 `--workspace` 相關的操作結論（既有內容只涵蓋單一作用中 workspace 內的 pane 操作），所以這不牴觸任何既有段落，只是留待未來若要擴充多 workspace 操作時的已知起點。
+- **`WMUX_SURFACE_ID` 的用途擴大**：先前只有 `browser.*` 指令會把呼叫者的 `WMUX_SURFACE_ID` 當作 `caller` 帶進 RPC（為了讓並行 agent 各自對到自己的瀏覽器 pane，issue #62）；v0.42.0 起所有 V2 指令都會帶。用途是讓多視窗環境下的狀態查詢（`tree`、`list-surfaces` 等）回答「呼叫者所在視窗」，而不是 Electron `getAllWindows()[0]` 這個順序不保證的任意視窗。這跟本文件「靜默環境偵測」第 1 點『檢查 `$WMUX_SURFACE_ID` 是否存在』是不同層面的事——那一步是 agent 自己讀 env 變數判斷是否身處 wmux，不依賴 wmux CLI 內部怎麼轉發這個值給 main process；本次上游修正不影響那個判斷方法，子 process 是否繼承到 `WMUX_SURFACE_ID` 純粹是一般 OS/shell 的 env 繼承行為，跟 wmux 版本無關。
+- **Diff Pane 與 crash 後 process 回收不在本技能範圍內**：release notes 提到的 diff pane 輪詢失控狂噴 `git.exe`、關閉分頁後被 hook 自動重開、以及異常退出後殘留 process 樹會在下次啟動被回收，都是 wmux app 本身（Electron main process／renderer）的行為，不是本技能涵蓋的「操作其他 pane」CLI primitive（本文件 frontmatter 已明確排除 `browser`／`markdown` 類指令，diff pane 同理不是本技能的操作對象）。因此這部分改善不需要、也沒有對應段落可修改。
+- **本次未做、且不能省略的部分**：未安裝／未以任何形式啟動 v0.42.0，因此沒有 `wmux identify`／`wmux capabilities` 現場輸出可核對版本號與 capabilities，也沒有對真實 pane 重跑「執行前的授權邊界」「`ok: true` 不代表成功」「定位 pane／surface」三節列出的任何指令。在完成真正的 Windows wmux v0.42.0 實機驗證、並依 `../../docs/testing.md` 第 2 節的方法把結果記錄進一份新的「版本重新驗證紀錄（v0.42.0）」之前，本文件的驗證基準維持 v0.38.0 不變。
+
 ## 執行前的授權邊界：四類操作
 
 呼叫任何 wmux 指令前，先判斷它屬於哪一類，套用對應的謹慎程度。這四類跟後面「定位是否可靠」是不同維度，兩者都要顧到：
