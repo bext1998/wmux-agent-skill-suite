@@ -104,6 +104,10 @@ BLOCKED#<id>: 一句話說明卡在什麼決策或資訊上
 
 依 `../wmux-best-practice/SKILL.md` 對 upstream v0.39.0–v0.41.0 官方 Release Notes 的調查（純文件調查，非本機實測，詳見該檔案對應段落）：`answer-agent`（v0.41.0 新增）理論上可以讓 orchestrator 不必切換到目標 pane、直接對一個已宣告 `blocked` 且帶 `--choices` 的 agent 送出回覆，可能可以取代或補強上面「派工→核對→提交→輪詢」流程裡靠 `read-screen` 輪詢文字標記判斷 `BLOCKED#<id>` 的做法。但 upstream 官方文件明確聲明 **Claude Code 目前無法宣告 `--choices`**（只會傳出「需要你」訊號，不帶結構化選項資料），所以就算未來採用 v0.41.0，對 Claude Code worker 而言也不會有實際差異；只有主動採用這個宣告協議的 harness（可能包含 Codex、Pi，但兩者是否已支援未經查證，只是 upstream 文件沒有點名排除）才可能受益。這組指令在 v0.38.0 上不存在、v0.41.0 因效能問題未安裝，本文件的升級規則暫不採用，維持既有 `send`/`read-screen` 做法。
 
+### v0.42.0 已知資訊
+
+`../wmux-best-practice/SKILL.md` 的「版本重新驗證紀錄（v0.42.0）」記錄該版本修好了 v0.41.0 促成本機降版的效能問題，並已於 2026-08-04（win32）對 `--workspace`／`--pane` 旗標、`WMUX_SURFACE_ID` env 存在與繼承完成真實實機驗證——依本文件慣例（引用 `wmux-best-practice` 的版本紀錄，不另立一份），細節見該段落，不在此重複。核心結論：本文件的 Worker Registry、單行任務協議、per-harness 適配層皆未使用到 `--workspace` 或多視窗路由，這些異動不影響本文件既有的派工流程；但本文件實際依賴的 `send`/`read-screen` 輪詢與上面「Per-harness 適配層」表格內的即時互動行為，本次未在 v0.42.0 上重新驗證，這部分驗證基準維持 v0.38.0 不變，待另外對真實 pane 重跑後再一併更新。
+
 ## 邊界
 
 - 授權邊界、`send`/`read-screen` 核對流程、`--surface` 定位限制、`ok: true` 不代表成功等結論，一律引用 `../wmux-best-practice/SKILL.md`，不在本文件複製或另立一份，避免兩份文件漂移。

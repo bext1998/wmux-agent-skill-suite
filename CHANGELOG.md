@@ -4,7 +4,10 @@
 
 ## [Unreleased]
 
-（尚無項目）
+### Added
+
+- 追蹤 upstream wmux `v0.42.0`（2026-08-03 發布，[release notes](https://github.com/amirlehmam/wmux/releases/tag/v0.42.0)）的已知資訊（issue #8）：該版本修好了造成本專案放棄 `v0.41.0`、改採 `v0.38.0` 的兩個嚴重效能問題（diff pane 輪詢失控狂噴 `git.exe`、crash 後 process 樹殘留），以及 `wmux tree --workspace`／`list-surfaces --workspace`/`--pane` 旗標修復、V2 指令全面攜帶 `WMUX_SURFACE_ID` 這兩項 CLI 表面異動。內容全部來自比對官方 release notes 與對應 commit，**未進行 Windows wmux 實機驗證**，因此本次不變更「版本重新驗證紀錄」或版本基準（維持 `v0.38.0`），也不宣稱已對 `v0.42.0` 完成適配。詳見兩個技能檔案內新增的「v0.42.0 已知資訊」段落與 [README.md](README.md#版本基準)。後續若要正式將驗證基準升級到 `v0.42.0`，需要另外完成 `docs/testing.md` 第 2 節描述的實機驗證流程。
+- 2026-08-04：本機 wmux 已實際升級到 `v0.42.0`，依 `docs/testing.md` 第 2 節完成部分 Windows wmux 實機驗證（issue #8 後續）：`wmux identify`／`wmux capabilities` 現場確認版本與 capabilities；對真實存在的兩個 workspace 現場重跑 `wmux tree --workspace <id>`／`wmux list-surfaces --workspace <id>`／`wmux list-surfaces --pane <id>`，確認 `--workspace`／`--pane` 旗標修復屬實（正確回傳指定 workspace／pane 的內容，不再是先前忽略旗標的行為）；確認 `$WMUX_SURFACE_ID` 存在且被子 process 繼承。上述項目已由「僅來自 release notes/commit diff」升級為已實機驗證，記錄進兩個技能檔案的「版本重新驗證紀錄（v0.42.0）」。`WMUX_SURFACE_ID` 的多視窗 caller 語意（因本機只有單一 wmux 視窗，無法測）、以及非唯讀三類操作（可逆寫入／建立資源／破壞性）、`ok: true` 可靠性、跨 pane 交接、per-harness 適配層等其餘既有結論，本次**未在 v0.42.0 上逐項重新驗證**，繼續沿用 `v0.38.0` 記錄；整體驗證基準因此維持 `v0.38.0`，僅上述已列出項目視為已對 `v0.42.0` 驗證。
 
 ## [0.0.1] - 2026-08-02
 
