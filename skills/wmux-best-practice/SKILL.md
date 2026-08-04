@@ -66,7 +66,7 @@ description: 在 wmux（多視窗終端機）環境下操作其他 pane、跟另
 - **`WMUX_SURFACE_ID` 用途擴大這件事本身，仍只驗證到「env 存在且被繼承」，未驗證多視窗場景**：release notes／commit diff 聲稱 v0.42.0 起所有 V2 指令都會把呼叫者的 `WMUX_SURFACE_ID` 當作 `caller` 帶入 RPC，讓多視窗環境下的狀態查詢回答「呼叫者所在視窗」而非 Electron `getAllWindows()[0]` 這個順序不保證的任意視窗——本機只有單一 wmux app 視窗（多個 workspace 共用同一視窗），無法實際製造「有多個 wmux 視窗、驗證查詢是否真的對到呼叫者那個視窗」的場景，這部分語意仍是**推論、未實機驗證**。這跟本文件「靜默環境偵測」第 1 點『檢查 `$WMUX_SURFACE_ID` 是否存在』是不同層面的事——那一步是 agent 自己讀 env 變數判斷是否身處 wmux，不依賴 wmux CLI 內部怎麼轉發這個值給 main process；上游這項修正不影響那個判斷方法。
 - **未重跑、沿用既有紀錄的項目**：本次只驗證了上述唯讀查詢類指令。「執行前的授權邊界」四類操作中的可逆寫入／建立資源／破壞性三類（`send`、`send-key`、`notify`、`split`、`new-surface`、`agent spawn`、`pane close`、`close-surface`、`agent kill` 等）、`--surface` 定位限制、`ok: true` 不保證成功、`close-pane --surface` 無效、跨 pane 的 `send`/`send-key` 交接流程等既有結論，本次**未在 v0.42.0 上逐項重新驗證**，繼續沿用 0.36.0/0.38.0 的實機紀錄，不得視為已對 v0.42.0 完成驗證。
 - **Diff Pane 與 crash 後 process 回收不在本技能範圍內**：release notes 提到的 diff pane 輪詢失控狂噴 `git.exe`、關閉分頁後被 hook 自動重開、以及異常退出後殘留 process 樹會在下次啟動被回收，都是 wmux app 本身（Electron main process／renderer）的行為，不是本技能涵蓋的「操作其他 pane」CLI primitive（本文件 frontmatter 已明確排除 `browser`／`markdown` 類指令，diff pane 同理不是本技能的操作對象）。這部分本次未測試、也不需要測試，維持僅來自 release notes 的紀錄。
-- **結論**：`--workspace`/`--pane` 旗標修復、`WMUX_SURFACE_ID` env 存在與繼承，已由「僅來自 release notes/commit diff」升級為已實機驗證；`WMUX_SURFACE_ID` 的多視窗 caller 語意、以及本節以外本文件記錄的其餘具體行為結論（授權四類操作、`--surface` 定位限制、`ok: true` 可靠性、跨 pane 交接等），驗證基準維持 0.36.0/0.38.0 不變，尚未在 v0.42.0 上逐項重新驗證。
+- **結論**：`--workspace`/`--pane` 旗標修復、`WMUX_SURFACE_ID` env 存在與繼承，已由「僅來自 release notes/commit diff」升級為已實機驗證；`WMUX_SURFACE_ID` 的多視窗 caller 語意、以及本節以外本文件記錄的其餘具體行為結論（非唯讀三類操作——可逆寫入／建立資源／破壞性、`--surface` 定位限制、`ok: true` 可靠性、跨 pane 交接等），驗證基準維持 0.36.0/0.38.0 不變，尚未在 v0.42.0 上逐項重新驗證。
 
 ## 執行前的授權邊界：四類操作
 
