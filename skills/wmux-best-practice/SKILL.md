@@ -68,6 +68,16 @@ description: 在 wmux（多視窗終端機）環境下操作其他 pane、跟另
 - **Diff Pane 與 crash 後 process 回收不在本技能範圍內**：release notes 提到的 diff pane 輪詢失控狂噴 `git.exe`、關閉分頁後被 hook 自動重開、以及異常退出後殘留 process 樹會在下次啟動被回收，都是 wmux app 本身（Electron main process／renderer）的行為，不是本技能涵蓋的「操作其他 pane」CLI primitive（本文件 frontmatter 已明確排除 `browser`／`markdown` 類指令，diff pane 同理不是本技能的操作對象）。這部分本次未測試、也不需要測試，維持僅來自 release notes 的紀錄。
 - **結論**：`--workspace`/`--pane` 旗標修復、`WMUX_SURFACE_ID` env 存在與繼承，已由「僅來自 release notes/commit diff」升級為已實機驗證；`WMUX_SURFACE_ID` 的多視窗 caller 語意、以及本節以外本文件記錄的其餘具體行為結論（非唯讀三類操作——可逆寫入／建立資源／破壞性、`--surface` 定位限制、`ok: true` 可靠性、跨 pane 交接等），驗證基準維持 0.36.0/0.38.0 不變，尚未在 v0.42.0 上逐項重新驗證。
 
+### v0.42.0 可逆寫入類指令實測補充（2026-08-05）
+
+同一台機器、同一個 v0.42.0 安裝（`wmux identify`/`wmux capabilities` 現場重新確認版本與 capabilities 不變），本次額外對「執行前的授權邊界」四類操作中的**可逆寫入**類（`send`、`send-key`、`notify`）做了真實重跑驗證。方法：先用 `new-workspace` 建立一個跟既有任何 pane 都無關的獨立測試 workspace（不動到使用者原有的 pane），在裡面新建的空 pane 上測試，測完仍保留該 workspace 供後續建立資源／破壞性類測試使用，未清除。
+
+- **`send`/`send-key` 確認真的生效，但要注意 `ok:true` 之後怎麼核對**：對測試 pane 送出一段「把標記寫入磁碟檔案」的 PowerShell 指令並按 Enter，兩次呼叫都回報 `{"ok": true}`；直接讀磁碟確認檔案真的被建立、內容正確——證實按鍵確實送達並被執行。
+- **但同一目標 surface 呼叫 `read-screen --surface <id>` 連續 5 次都回傳 `{"text": "", "lines": 0}`**：包括（a）剛才那個已確認指令生效的測試 pane，（b）隔壁 pi pane（僅唯讀查詢，未對 pi 送出任何指令或內容）。不論目標 pane 所在 workspace 是否為目前作用中 workspace、是否額外帶 `--workspace` 旗標，結果一致——只有呼叫者自己 `$WMUX_SURFACE_ID` 對應的 surface，`read-screen` 才可靠回傳內容，其餘目標本次全部空讀。這跟下面「跨 pane 的 send/read-screen 交接流程」一節既有的「間歇性空讀，原因未明」是同一現象的更強證據，不是新問題也不是既有紀錄錯誤——既有文件記錄成「偶爾發生」，本次是 5/5 全部落空，樣本數小（單一台機器、單一 session），不足以斷言 v0.42.0 把「間歇性」變成「必然」，但足以確認不是罕見個案。**實務上：要確認一個非自身 pane 的指令是否真的生效時，優先用可觀察的外部副作用（例如寫入檔案後直接讀檔）交叉驗證，不要只憑 read-screen 空讀就判定失敗，也不要只憑 `ok:true` 就判定成功。**
+- **`notify` 確認可用，回應格式跟 `send`/`send-key` 不同**：回傳的不是 `{"ok": true}`，而是純文字 `Notification sent`；`list-notifications`（唯讀）核對後確認通知確實掛在呼叫者自己的 surface 上，內容與 workspace 歸屬正確，與既有文件「notify 會自動掛在呼叫者自己的 surface 上」的結論一致。
+- **`clear-notifications` 疑似不生效，是本次新發現的 `ok:true` 不保證成功案例**：連續呼叫兩次（一次不帶參數、一次帶 `--surface <own-id>`）都回報 `{"ok": true}`，但事後 `list-notifications` 查詢，該筆測試通知仍然存在、未被清除。**該筆測試通知（id `notif-26480801-947e-4b10-a19f-c6b63b6a1302`，內容「v0.42.0 驗證測試通知 - 可忽略」）目前仍殘留在使用者的 wmux 通知列表裡，本次未能透過 CLI 清除，需要使用者自行在 wmux UI 上忽略或清掉。**
+- **本次仍未測試**：建立資源類（`split`/`new-surface`/`agent spawn`）與破壞性類（`pane close`/`close-surface`/`agent kill`）尚未執行，待後續繼續，不得視為已對這兩類完成 v0.42.0 驗證。
+
 ## 執行前的授權邊界：四類操作
 
 呼叫任何 wmux 指令前，先判斷它屬於哪一類，套用對應的謹慎程度。這四類跟後面「定位是否可靠」是不同維度，兩者都要顧到：
