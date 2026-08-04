@@ -108,7 +108,7 @@ BLOCKED#<id>: 一句話說明卡在什麼決策或資訊上
 
 `../wmux-best-practice/SKILL.md` 的「版本重新驗證紀錄（v0.42.0）」記錄該版本修好了 v0.41.0 促成本機降版的效能問題，並已於 2026-08-04（win32）對 `--workspace`／`--pane` 旗標、`WMUX_SURFACE_ID` env 存在與繼承完成真實實機驗證——依本文件慣例（引用 `wmux-best-practice` 的版本紀錄，不另立一份），細節見該段落，不在此重複。核心結論：本文件的 Worker Registry、單行任務協議、per-harness 適配層皆未使用到 `--workspace` 或多視窗路由，這些異動不影響本文件既有的派工流程；但本文件實際依賴的 `send`/`read-screen` 輪詢與上面「Per-harness 適配層」表格內的即時互動行為，本次未在 v0.42.0 上重新驗證，這部分驗證基準維持 v0.38.0 不變，待另外對真實 pane 重跑後再一併更新。
 
-**2026-08-05 更新**：`../wmux-best-practice/SKILL.md` 已在 v0.42.0 上補測了 `send`／`read-screen`／`notify` 等可逆寫入類指令（見該檔案「v0.42.0 可逆寫入類指令實測補充」），`send` 確認真的可靠送達；但**同一次測試中，對非呼叫者自身的 surface 呼叫 `read-screen` 連續 5 次全部空讀**，比既有「間歇性空讀」的描述更頻繁（樣本數小，不足以斷言必然如此）。這件事對本文件的核心流程有直接影響——本文件整套「派工→核對→提交→輪詢」都靠 `read-screen` 讀 worker pane 的畫面判斷 `idle`／`busy`／`DONE#<id>`，如果空讀比預期常見，輪詢時更需要落實既有的「讀到空白先重讀一次，不要第一時間判定 pane 消失或任務卡住」（見上面「邊界」一節），必要時可以考慮拉高重讀次數而不是只重讀一次。本次未針對真實 Codex／Pi worker pane 重新驗證上面「Per-harness 適配層」表格，這部分仍待另外對真實 pane 重跑後更新。
+**2026-08-05 更新**：`../wmux-best-practice/SKILL.md` 已補測 v0.42.0 的 `send`/`read-screen`/`notify`（見該檔案「v0.42.0 非唯讀三類指令實測補充」）——`send` 可靠，但對非自身 surface 的 `read-screen` 連續 5 次空讀，比既有「間歇性空讀」描述更頻繁。本文件的輪詢流程依賴 `read-screen` 判斷 worker 狀態，空讀先重讀（見「邊界」一節）這條既有做法更加重要。未針對真實 Codex／Pi worker pane 重新驗證上面「Per-harness 適配層」表格。
 
 ## 邊界
 

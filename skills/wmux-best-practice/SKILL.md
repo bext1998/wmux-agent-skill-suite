@@ -17,11 +17,11 @@ description: 在 wmux（多視窗終端機）環境下操作其他 pane、跟另
 2. **env 不足時的唯讀 fallback**：`$WMUX`／`$WMUX_SURFACE_ID` 缺一或全無時，改呼叫唯讀指令 `wmux identify`（或 `wmux ping`）。成功回應 → 判定身處 wmux（例如巢狀 shell 未繼承 env 的情況），但沒有 `WMUX_SURFACE_ID` 可用時，需另外用 `tree`／`list-panes` 找出自己的 surface id 才能繼續。失敗（非零 exit code 或錯誤）→ 判定不在 wmux 環境下。
 3. **env 可能過期時二次確認**：`$WMUX=1` 只代表這個 process 曾經繼承到該變數，不保證底層 pipe 目前仍存活。在依賴 env 判斷結果去執行任何非唯讀指令（可逆寫入／建立資源／破壞性操作）之前，先用 `identify` 或 `ping` 二次確認 pipe 仍然可用；只做唯讀查詢（如 `read-screen`）時可以省略這一步。
 4. **非 wmux 環境安靜退出**：判定不在 wmux 底下時，直接安靜跳過本技能其餘所有內容，不觸發、不嘗試任何其他 wmux 指令，也不需要向使用者報告「偵測失敗」這件事本身——除非使用者本來就是在問「這是不是 wmux 環境」。
-5. **版本漂移仍需重新驗證**：`identify`/`ping` 確認完「身處 wmux」只代表偵測本身成功，不代表下面「驗證環境與適用範圍」列出的具體行為結論（`--surface` 有效性、`close-pane` 是否真的關閉等）依然成立——版本不符時一律視同未驗證，套用下一節的重新確認方法。實測記錄：本文件行為基準最初建於 wmux 0.28.0，2026-07-29（win32）以 `wmux identify` 確認到 0.36.0 並重新核對過主要結論；本次遷移（2026-08-02，win32）再次以 `wmux identify`/`wmux capabilities` 現場確認版本為 **0.38.0**，但本次只重跑了 `identify`/`capabilities`/`wmux`（指令說明列表）/自身 `read-screen`，`--surface`/`--pane` 定位限制、`ok: true` 不保證成功、`close-pane --surface` 無效等既有結論**沿用 0.36.0 的實機紀錄，本次未在 0.38.0 上逐項重新驗證**。2026-08-04（win32）本機 wmux 升級到 **v0.42.0**，再次以 `wmux identify`/`wmux capabilities` 現場確認版本，本次額外對 `--workspace`/`--pane` 旗標與 `WMUX_SURFACE_ID` 的行為做了真實重跑驗證；但可逆寫入／建立資源／破壞性三類指令、`--surface` 定位限制、`ok: true` 不保證成功、`close-pane --surface` 無效等既有結論本次同樣**未在 v0.42.0 上逐項重新驗證**，繼續沿用 0.36.0/0.38.0 的實機紀錄。詳細範圍分見下方「版本重新驗證紀錄（v0.38.0）」與「版本重新驗證紀錄（v0.42.0）」。**2026-08-05（win32，同一個 v0.42.0 安裝）補上了上面缺的部分**：可逆寫入／建立資源／破壞性三類指令已在獨立測試 workspace 逐項重新實機驗證，`--surface` 定位限制、`ok: true` 不保證成功、`close-pane --surface` 無效等既有結論皆重新確認成立；另外首次在真實多視窗環境下驗證了 `WMUX_SURFACE_ID` 的 caller 語意。詳細內容見下方「v0.42.0 可逆寫入類指令實測補充」與「v0.42.0 建立資源與破壞性類指令實測補充」兩個小節。
+5. **版本漂移仍需重新驗證**：`identify`/`ping` 確認完「身處 wmux」只代表偵測本身成功，不代表下面「驗證環境與適用範圍」列出的具體行為結論（`--surface` 有效性、`close-pane` 是否真的關閉等）依然成立——版本不符時一律視同未驗證，套用下一節的重新確認方法。實測記錄：本文件行為基準最初建於 wmux 0.28.0，2026-07-29（win32）以 `wmux identify` 確認到 0.36.0 並重新核對過主要結論；本次遷移（2026-08-02，win32）再次以 `wmux identify`/`wmux capabilities` 現場確認版本為 **0.38.0**，但本次只重跑了 `identify`/`capabilities`/`wmux`（指令說明列表）/自身 `read-screen`，`--surface`/`--pane` 定位限制、`ok: true` 不保證成功、`close-pane --surface` 無效等既有結論**沿用 0.36.0 的實機紀錄，本次未在 0.38.0 上逐項重新驗證**。2026-08-04（win32）本機 wmux 升級到 **v0.42.0**，再次以 `wmux identify`/`wmux capabilities` 現場確認版本，本次額外對 `--workspace`/`--pane` 旗標與 `WMUX_SURFACE_ID` 的行為做了真實重跑驗證；但可逆寫入／建立資源／破壞性三類指令、`--surface` 定位限制、`ok: true` 不保證成功、`close-pane --surface` 無效等既有結論本次同樣**未在 v0.42.0 上逐項重新驗證**，繼續沿用 0.36.0/0.38.0 的實機紀錄。詳細範圍分見下方「版本重新驗證紀錄（v0.38.0）」與「版本重新驗證紀錄（v0.42.0）」。2026-08-05 補上前述缺口：非唯讀三類指令與多視窗 caller 語意已重新實機驗證，詳見下方「v0.42.0 非唯讀三類指令實測補充」。
 
 ## 驗證環境與適用範圍
 
-以下所有具體行為結論（哪個旗標有效、預設會落在哪個 pane 等）的實機驗證基準是 `wmux identify` 回報 `version 0.28.0`／`0.36.0`，`platform win32`；`wmux capabilities` 回報 `protocols: ["v1","v2"]`、`features: ["workspaces","splits","notifications"]`。`0.38.0` 現場確認過版本號、capabilities 與 `identify`/`capabilities`/`wmux`（指令說明列表）/自身 `read-screen` 這幾項，但**未逐項重新驗證**其餘具體結論（詳見下方「版本重新驗證紀錄（v0.38.0）」），因此上述行為結論目前仍以 0.36.0 的實機紀錄為準。`0.42.0` 現場確認過版本號、capabilities，以及 `--workspace`/`--pane` 旗標、`WMUX_SURFACE_ID` 的實際行為（詳見下方「版本重新驗證紀錄（v0.42.0）」），2026-08-05 又補上可逆寫入／建立資源／破壞性三類指令與多視窗 caller 語意的實機驗證（詳見下方兩個「v0.42.0 …實測補充」小節），本節絕大部分具體結論目前已在 v0.42.0 上逐項重新驗證過，不再只是沿用 0.36.0 的紀錄；仍以 0.36.0 紀錄為準、尚未在 v0.42.0 重跑的項目，只剩上述小節裡明確標註「未測試」的部分（目前為零，見「建立資源與破壞性類指令實測補充」結論）。**這些是特定版本下實測觀察到的行為，不是保證不變的 API 契約。** 在不同版本、不同平台（例如 macOS/Linux）或回報不同 protocol/feature 的 wmux instance 上，行為可能不同——換到新環境前，先用 `identify`／`capabilities` 核對版本與能力，若版本不同就視同未驗證，用本文件的判斷方法（呼叫前後用唯讀指令核對）重新確認一次，不要直接套用下面列出的具體結論。
+以下所有具體行為結論（哪個旗標有效、預設會落在哪個 pane 等）的實機驗證基準是 `wmux identify` 回報 `version 0.28.0`／`0.36.0`，`platform win32`；`wmux capabilities` 回報 `protocols: ["v1","v2"]`、`features: ["workspaces","splits","notifications"]`。`0.38.0` 現場確認過版本號、capabilities 與 `identify`/`capabilities`/`wmux`（指令說明列表）/自身 `read-screen` 這幾項，但**未逐項重新驗證**其餘具體結論（詳見下方「版本重新驗證紀錄（v0.38.0）」），因此上述行為結論目前仍以 0.36.0 的實機紀錄為準。`0.42.0` 現場確認過版本號、capabilities，以及 `--workspace`/`--pane` 旗標、`WMUX_SURFACE_ID` 的實際行為（詳見下方「版本重新驗證紀錄（v0.42.0）」），2026-08-05 補上非唯讀三類指令與多視窗 caller 語意的實機驗證（見下方「v0.42.0 非唯讀三類指令實測補充」），本節結論目前已全數在 v0.42.0 重新驗證過。**這些是特定版本下實測觀察到的行為，不是保證不變的 API 契約。** 在不同版本、不同平台（例如 macOS/Linux）或回報不同 protocol/feature 的 wmux instance 上，行為可能不同——換到新環境前，先用 `identify`／`capabilities` 核對版本與能力，若版本不同就視同未驗證，用本文件的判斷方法（呼叫前後用唯讀指令核對）重新確認一次，不要直接套用下面列出的具體結論。
 
 ### 版本重新驗證紀錄（v0.38.0）
 
@@ -68,40 +68,33 @@ description: 在 wmux（多視窗終端機）環境下操作其他 pane、跟另
 - **Diff Pane 與 crash 後 process 回收不在本技能範圍內**：release notes 提到的 diff pane 輪詢失控狂噴 `git.exe`、關閉分頁後被 hook 自動重開、以及異常退出後殘留 process 樹會在下次啟動被回收，都是 wmux app 本身（Electron main process／renderer）的行為，不是本技能涵蓋的「操作其他 pane」CLI primitive（本文件 frontmatter 已明確排除 `browser`／`markdown` 類指令，diff pane 同理不是本技能的操作對象）。這部分本次未測試、也不需要測試，維持僅來自 release notes 的紀錄。
 - **結論**：`--workspace`/`--pane` 旗標修復、`WMUX_SURFACE_ID` env 存在與繼承，已由「僅來自 release notes/commit diff」升級為已實機驗證；`WMUX_SURFACE_ID` 的多視窗 caller 語意、以及本節以外本文件記錄的其餘具體行為結論（非唯讀三類操作——可逆寫入／建立資源／破壞性、`--surface` 定位限制、`ok: true` 可靠性、跨 pane 交接等），驗證基準維持 0.36.0/0.38.0 不變，尚未在 v0.42.0 上逐項重新驗證。
 
-### v0.42.0 可逆寫入類指令實測補充（2026-08-05）
+### v0.42.0 非唯讀三類指令實測補充（2026-08-05）
 
-同一台機器、同一個 v0.42.0 安裝（`wmux identify`/`wmux capabilities` 現場重新確認版本與 capabilities 不變），本次額外對「執行前的授權邊界」四類操作中的**可逆寫入**類（`send`、`send-key`、`notify`）做了真實重跑驗證。方法：先用 `new-workspace` 建立一個跟既有任何 pane 都無關的獨立測試 workspace（不動到使用者原有的 pane），在裡面新建的空 pane 上測試，測完仍保留該 workspace 供後續建立資源／破壞性類測試使用，未清除。
+在一個獨立測試 workspace（未動到使用者原有 pane，測完已 `close-workspace` 清除；`tree` 比對前後逐字一致）逐項驗證：
 
-- **`send`/`send-key` 確認真的生效，但要注意 `ok:true` 之後怎麼核對**：對測試 pane 送出一段「把標記寫入磁碟檔案」的 PowerShell 指令並按 Enter，兩次呼叫都回報 `{"ok": true}`；直接讀磁碟確認檔案真的被建立、內容正確——證實按鍵確實送達並被執行。
-- **但同一目標 surface 呼叫 `read-screen --surface <id>` 連續 5 次都回傳 `{"text": "", "lines": 0}`**：包括（a）剛才那個已確認指令生效的測試 pane，（b）隔壁 pi pane（僅唯讀查詢，未對 pi 送出任何指令或內容）。不論目標 pane 所在 workspace 是否為目前作用中 workspace、是否額外帶 `--workspace` 旗標，結果一致——只有呼叫者自己 `$WMUX_SURFACE_ID` 對應的 surface，`read-screen` 才可靠回傳內容，其餘目標本次全部空讀。這跟下面「跨 pane 的 send/read-screen 交接流程」一節既有的「間歇性空讀，原因未明」是同一現象的更強證據，不是新問題也不是既有紀錄錯誤——既有文件記錄成「偶爾發生」，本次是 5/5 全部落空，樣本數小（單一台機器、單一 session），不足以斷言 v0.42.0 把「間歇性」變成「必然」，但足以確認不是罕見個案。**實務上：要確認一個非自身 pane 的指令是否真的生效時，優先用可觀察的外部副作用（例如寫入檔案後直接讀檔）交叉驗證，不要只憑 read-screen 空讀就判定失敗，也不要只憑 `ok:true` 就判定成功。**
-- **`notify` 確認可用，回應格式跟 `send`/`send-key` 不同**：回傳的不是 `{"ok": true}`，而是純文字 `Notification sent`；`list-notifications`（唯讀）核對後確認通知確實掛在呼叫者自己的 surface 上，內容與 workspace 歸屬正確，與既有文件「notify 會自動掛在呼叫者自己的 surface 上」的結論一致。
-- **`clear-notifications` 疑似不生效，是本次新發現的 `ok:true` 不保證成功案例**：連續呼叫兩次（一次不帶參數、一次帶 `--surface <own-id>`）都回報 `{"ok": true}`，但事後 `list-notifications` 查詢，該筆測試通知仍然存在、未被清除。**該筆測試通知（id `notif-26480801-947e-4b10-a19f-c6b63b6a1302`，內容「v0.42.0 驗證測試通知 - 可忽略」）目前仍殘留在使用者的 wmux 通知列表裡，本次未能透過 CLI 清除，需要使用者自行在 wmux UI 上忽略或清掉。**
-- **本次仍未測試**：建立資源類（`split`/`new-surface`/`agent spawn`）與破壞性類（`pane close`/`close-surface`/`agent kill`）尚未執行，待後續繼續，不得視為已對這兩類完成 v0.42.0 驗證。**後續更新**：同一天（2026-08-05）稍後已補測，見下方「v0.42.0 建立資源與破壞性類指令實測補充」。
+- `send`/`send-key`：確認生效（用寫入磁碟檔案的副作用驗證，非只看 `ok:true`）。
+- `read-screen --surface <非自身 id>`：連續 5 次空讀（含一個剛確認生效的測試 pane、隔壁 pi pane），比既有「間歇性空讀」記錄更頻繁（樣本小，不代表 v0.42.0 必然如此）。**核對非自身 pane 的指令是否生效，優先用外部副作用交叉驗證，不要只憑 read-screen 或 `ok:true`。**
+- `notify`：可用，回應是純文字 `Notification sent`（不是 `{"ok":true}`），掛在呼叫者自己 surface，符合既有結論。
+- `clear-notifications`：**新發現**，`ok:true` 但未實際清除。殘留一筆測試通知在使用者 wmux 通知列表（id `notif-26480801-947e-4b10-a19f-c6b63b6a1302`），CLI 清不掉，需使用者手動忽略。
+- `split`/`new-surface`（含 `--pane`）：沿用既有結論，固定落在**作用中 workspace**第一個 leaf pane，`--pane` 被忽略（新確認：「第一個」是相對作用中 workspace，非全 app 唯一）。
+- `agent spawn --pane <id>`：**新發現**，`--pane` 可靠，準確落在指定 pane（`agent list` 的 `paneId` 核對），跟 `split`/`new-surface --pane` 不同，已補進下方表格。
+- `agent kill`：可靠，`status` 從 `running` 變 `exited`。
+- `close-surface`：可靠。
+- `close-pane --surface <id>`：沿用既有結論，`ok:true` 但沒關到。
+- `pane close <paneId>`（verb form）：可靠。
+- `close-workspace`：可靠。
+- `new-window`：建立第二個真實 OS 視窗後，從原視窗呼叫不帶 `--workspace` 的 `list-workspaces`/`tree` 只回傳呼叫者自己視窗的資料——首次直接證實 `WMUX_SURFACE_ID` 多視窗 caller 語意，不再只是推論。**但沒有任何 CLI 指令能關閉 `new-window` 開的視窗**（`close-window`/`window close` 皆 `Unknown command`），需使用者手動關閉。
 
-### v0.42.0 建立資源與破壞性類指令實測補充（2026-08-05）
+至此「執行前的授權邊界」四類操作已全數在 v0.42.0 重新驗證。
 
-延續上面「可逆寫入類指令實測補充」使用的同一個獨立測試 workspace，同一天稍後（使用者已明確授權破壞性操作不需逐次詢問，仍限定在這個獨立測試 workspace、不觸碰使用者原有的 pane）補測了**建立資源**、**破壞性**兩類，以及 `new-window` 多視窗場景：
+### v0.43.0 已知資訊（純 release notes／PR 描述，未實機驗證，2026-08-05）
 
-- **`split` 確認沿用既有結論，且新確認「第一個 leaf pane」是相對於呼叫當下的作用中 workspace，不是全域固定的某個 pane**：在測試 workspace 裡呼叫 `split`，新 pane 正確落在該 workspace 內、完全沒有影響到 Session 2（使用者原本的 claude/pi pane，呼叫前後 `tree` 比對逐字一致）。之後改用 `split --pane <指定第二個 pane 的 id>` 想指定分割位置，結果新 pane 仍然掛在該 workspace「第一個 leaf pane」底下、跟指定的 `--pane` 無關——**重新確認「定位 pane／surface」表格裡 `split`/`new-surface --pane` 無效的既有結論在 v0.42.0 依然成立**，只是把「第一個 leaf pane」的範圍界定得更精確：是當下作用中 workspace 裡的第一個 leaf，不是全 app 唯一一個。
-- **`new-surface` 確認沿用既有結論**：固定加在作用中 workspace 第一個 leaf pane 上，新增一個 tab，不受任何定位旗標影響。
-- **`agent spawn --pane <id>` 是新發現，跟 `split`/`new-surface --pane` 不同**：明確指定 `--pane` 為該 workspace「第二個」pane 後，回傳的 `agentId`/`surfaceId` 確實掛在指定的那個 pane 上（用 `agent list` 核對 `paneId` 相符），不是落在第一個 leaf pane。**`--pane` 對 `agent spawn` 是可靠的**，這點既有「定位 pane／surface」表格沒有記錄過（表格原本只涵蓋 `split`、`new-surface --pane`），是本次新增的資訊，不是對舊結論的推翻。
-- **`agent kill` 確認可靠**：對剛 spawn 的測試 agent 呼叫 `agent kill <agentId>`，`agent list` 核對後 `status` 從 `running` 正確變成 `exited`（`exitCode: -1`）。
-- **`close-surface` 確認可靠**：對測試 tab 呼叫後，`list-surfaces` 核對該 surface 確實消失。
-- **`close-pane --surface <id>` 重新確認依然無效**：回傳 `{"ok": true}`，但 `list-panes` 核對後目標 pane 完全沒被關掉——既有「定位 pane／surface」表格這條結論在 v0.42.0 重新實測成立，不是舊版殘留問題。
-- **`pane close <paneId>`（verb form）確認可靠**：呼叫後 `list-panes` 核對該 pane 確實消失，符合既有結論。
-- **`close-workspace` 確認可靠**：測試全部做完後，用 `close-workspace <測試 workspace id>` 整個收掉，`list-workspaces` 核對後只剩使用者原本的 workspace；再次 `tree` 核對 claude/pi 兩個 pane 內容與測試開始前逐字一致，未受任何影響。
-- **多視窗（`new-window`）：`WMUX_SURFACE_ID` 的 caller 語意首次取得直接實機證據**：呼叫 `new-window` 成功建立第二個真實 OS 視窗（`list-windows` 確認兩個視窗並存）。建立後，從**原本那個視窗裡的自己這個 pane**呼叫不帶 `--workspace` 的 `list-workspaces`／`tree`，回傳的都正確是「呼叫者自己所在視窗」的 workspace（也就是使用者原本的 Session 2，含 claude/pi 兩個 pane），完全沒有出現新視窗的內容、也沒有回報任何跟呼叫者無關的資料。這直接印證了上面「WMUX_SURFACE_ID 用途擴大」段落原本標註「推論、未實機驗證」的說法——**caller-based 定位在有多個真實視窗並存時確實生效**，不再是單一視窗環境下無法驗證的推論。
-- **重要限制，未來呼叫 `new-window`前要注意**：本次沒有找到任何 CLI 指令可以關閉 `new-window`建立的視窗——`close-window <id>`、`window close <id>` 都回報 `Unknown command`，`wmux` 完整指令列表裡也沒有其他候選。**目前殘留的第二個 OS 視窗只能由使用者手動關閉（例如點視窗右上角的關閉鈕），CLI 沒有清理路徑。呼叫 `new-window`前要有這個心理準備，不要假設可以自動清乾淨。**
-- **結論**：建立資源類（`split`/`new-surface`）、破壞性類（`close-surface`/`pane close`/`agent kill`/`close-pane --surface` 無效/`close-workspace`）既有結論全數在 v0.42.0 重新實機驗證成立；新增 `agent spawn --pane` 可靠定位、`WMUX_SURFACE_ID` 多視窗 caller 語意已實機驗證、`new-window` 無 CLI 清理路徑三項新資訊。至此「執行前的授權邊界」四類操作已全數在 v0.42.0 上逐項重新驗證過。
+同日 upstream 又發布 v0.43.0（本機未升級，仍是 v0.42.0）。[PR #144](https://github.com/amirlehmam/wmux/pull/144) 描述兩個修正，跟上面剛驗證的結論有關但未實測：
 
-### v0.43.0 已知資訊（純 release notes／PR 描述調查，未實機驗證，2026-08-05）
+- 修正一個「新視窗複製到重複 surface id、導致 caller 定位選錯視窗」的 edge case——跟今天測的乾淨雙視窗情境不同，不衝突但未涵蓋，升級後應補測。
+- 未知旗標從「靜默忽略、指令照跑」改成「直接拒絕」——可能影響上面 `split`/`new-surface --pane`（現況：靜默忽略）與 `close-pane --surface`（現況：`ok:true` 無效）的行為。
 
-上面所有 v0.42.0 驗證做完、寫完文件的同一天，upstream 又發布了 `v0.43.0`（2026-08-04，[release notes](https://github.com/amirlehmam/wmux/releases/tag/v0.43.0)，唯一內容是 [PR #144](https://github.com/amirlehmam/wmux/pull/144)）。本機這次**沒有升級**，`wmux identify` 現場確認仍是 `version 0.42.0`——以下內容全部只來自閱讀該 PR 描述，不是本機互動實測，是文件調查，不能升級成「已驗證」：
-
-- **PR #144 描述的兩個修正，剛好都碰到本文件今天才寫的既有結論**：
-  1. `WMUX_SURFACE_ID` caller 定位曾有一個本文件沒測過的邊界案例——`windowForCaller` 只問「這個視窗有沒有這個 surface」問到第一個 `yes` 就停，但 surface id 在多視窗下可能不是唯一的（PR 描述的原因是某些情境下新視窗會複製到跟舊視窗一樣的 workspace/pane/surface id），導致解析可能選到錯的視窗，且錯誤結果還會被視窗快取釘住、後續呼叫都沿用同一個錯誤答案。v0.43.0 把解析邏輯改成同時回傳視窗與 workspace、快取降級為「探測順序提示」而非權威結果。**本文件今天測的多視窗情境是乾淨的兩個獨立視窗、沒有複製 session 的邊界條件，所以今天驗證成立的「caller-based 定位在多視窗下確實生效」結論不衝突，但沒有涵蓋到這個更複雜的 edge case，升級後應該重新用「視窗中途開啟、可能複製到重複 id」的情境測一次。**
-  2. **未知旗標過去會被靜默忽略、指令照樣執行**（例如 `wmux split --help` 過去會真的建立一個 pane，`--help` 被當成無效旗標忽略掉，不會印出用法就結束）。v0.43.0 改成每個指令宣告自己的旗標，其他一律拒絕並印用法。**這很可能直接影響本文件「定位 pane／surface」表格裡好幾條結論**：例如 `split --pane <id>`／`new-surface --pane <id>` 今天在 v0.42.0 上實測是「回傳 `ok`、旗標被靜默忽略、落在第一個 leaf pane」——如果 `--pane` 在 v0.43.0 的新旗標表裡本來就不是 `split`/`new-surface` 宣告的合法旗標，行為可能會從「靜默忽略、成功但落錯地方」變成「直接報錯拒絕執行」；`close-pane --surface <id>`（本文件今天重新確認的「回傳 ok:true 但沒關到」陷阱）也可能有同樣的變化。PR 描述另外提到 `close-surface`／`focus-surface`／`rename-surface`／`close-pane` 這組「用 id 找目標」的指令，改成在整個視窗範圍找 id，不再限定只在作用中 workspace 裡找——**這點如果屬實，可能表示今天記錄的 `close-pane --surface` 无效這個陷阱在 v0.43.0 有機會被修正，但這純粹是讀 PR 描述的推論，沒有實機測過，不能當作已解決。**
-- **本文件現在的立場**：跟既有的 v0.39.0–v0.41.0 資訊一樣，v0.43.0 目前只是「已知資訊」，不是驗證基準，本文件所有具體行為結論繼續以 v0.42.0 的實機紀錄為準。等實際升級到 v0.43.0 後，優先重跑「定位 pane／surface」表格裡標成 ❌ 無效的那幾條（`split`/`new-surface --pane`、`close-pane --surface`）和多視窗 caller 定位的複製 id edge case，因為這兩塊最可能已經變了。
+以 v0.42.0 實機紀錄為準；升級後優先重測這兩項。
 
 ## 執行前的授權邊界：四類操作
 
@@ -140,7 +133,7 @@ description: 在 wmux（多視窗終端機）環境下操作其他 pane、跟另
 | `zoom-pane` | 純渲染層 toggle，API 查不到效果 | 不建議用於自動化 |
 | `focus-surface`／`focus-pane` | 效果無法驗證 | 不要依賴這兩個指令去改變任何後續指令的目標 |
 
-**重要更正（2026-08-05，v0.42.0 實機驗證）**：上面「只對三個指令真的有效：`send`、`send-key`、`read-screen`」這句話不再完整——實測發現 `agent spawn --pane <id>` 也可靠有效，會把新 agent 的 surface 準確掛在指定的既有 pane 上（用 `agent list` 的 `paneId` 核對過），跟 `split`／`new-surface --pane` 那組「接受旗標但靜默忽略」的行為不同。這條原始結論建立時只驗證過 `split`／`new-surface`，沒有測過 `agent spawn`，不是本次發現 v0.42.0 行為跟舊版不同，而是補上一個原本沒測過的指令。
+**更正（2026-08-05）**：上面「只對三個指令有效：`send`、`send-key`、`read-screen`」不再完整——`agent spawn --pane` 補測後確認也可靠。原結論建立時沒測過 `agent spawn`，是補漏，不是行為變更。
 
 **`send`／`send-key` 沒帶 `--surface` 時，會打到目前真正持有 OS 鍵盤焦點的 pane，不是任何邏輯上「選定」的 pane。** `--surface` 定位不需要目標 pane 曾經被使用者手動點過或呼叫過 `focus-surface`——對完全沒互動過的 pane 一樣可靠。
 
