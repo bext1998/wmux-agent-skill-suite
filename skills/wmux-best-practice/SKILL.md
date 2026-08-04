@@ -94,6 +94,15 @@ description: 在 wmux（多視窗終端機）環境下操作其他 pane、跟另
 - **重要限制，未來呼叫 `new-window`前要注意**：本次沒有找到任何 CLI 指令可以關閉 `new-window`建立的視窗——`close-window <id>`、`window close <id>` 都回報 `Unknown command`，`wmux` 完整指令列表裡也沒有其他候選。**目前殘留的第二個 OS 視窗只能由使用者手動關閉（例如點視窗右上角的關閉鈕），CLI 沒有清理路徑。呼叫 `new-window`前要有這個心理準備，不要假設可以自動清乾淨。**
 - **結論**：建立資源類（`split`/`new-surface`）、破壞性類（`close-surface`/`pane close`/`agent kill`/`close-pane --surface` 無效/`close-workspace`）既有結論全數在 v0.42.0 重新實機驗證成立；新增 `agent spawn --pane` 可靠定位、`WMUX_SURFACE_ID` 多視窗 caller 語意已實機驗證、`new-window` 無 CLI 清理路徑三項新資訊。至此「執行前的授權邊界」四類操作已全數在 v0.42.0 上逐項重新驗證過。
 
+### v0.43.0 已知資訊（純 release notes／PR 描述調查，未實機驗證，2026-08-05）
+
+上面所有 v0.42.0 驗證做完、寫完文件的同一天，upstream 又發布了 `v0.43.0`（2026-08-04，[release notes](https://github.com/amirlehmam/wmux/releases/tag/v0.43.0)，唯一內容是 [PR #144](https://github.com/amirlehmam/wmux/pull/144)）。本機這次**沒有升級**，`wmux identify` 現場確認仍是 `version 0.42.0`——以下內容全部只來自閱讀該 PR 描述，不是本機互動實測，是文件調查，不能升級成「已驗證」：
+
+- **PR #144 描述的兩個修正，剛好都碰到本文件今天才寫的既有結論**：
+  1. `WMUX_SURFACE_ID` caller 定位曾有一個本文件沒測過的邊界案例——`windowForCaller` 只問「這個視窗有沒有這個 surface」問到第一個 `yes` 就停，但 surface id 在多視窗下可能不是唯一的（PR 描述的原因是某些情境下新視窗會複製到跟舊視窗一樣的 workspace/pane/surface id），導致解析可能選到錯的視窗，且錯誤結果還會被視窗快取釘住、後續呼叫都沿用同一個錯誤答案。v0.43.0 把解析邏輯改成同時回傳視窗與 workspace、快取降級為「探測順序提示」而非權威結果。**本文件今天測的多視窗情境是乾淨的兩個獨立視窗、沒有複製 session 的邊界條件，所以今天驗證成立的「caller-based 定位在多視窗下確實生效」結論不衝突，但沒有涵蓋到這個更複雜的 edge case，升級後應該重新用「視窗中途開啟、可能複製到重複 id」的情境測一次。**
+  2. **未知旗標過去會被靜默忽略、指令照樣執行**（例如 `wmux split --help` 過去會真的建立一個 pane，`--help` 被當成無效旗標忽略掉，不會印出用法就結束）。v0.43.0 改成每個指令宣告自己的旗標，其他一律拒絕並印用法。**這很可能直接影響本文件「定位 pane／surface」表格裡好幾條結論**：例如 `split --pane <id>`／`new-surface --pane <id>` 今天在 v0.42.0 上實測是「回傳 `ok`、旗標被靜默忽略、落在第一個 leaf pane」——如果 `--pane` 在 v0.43.0 的新旗標表裡本來就不是 `split`/`new-surface` 宣告的合法旗標，行為可能會從「靜默忽略、成功但落錯地方」變成「直接報錯拒絕執行」；`close-pane --surface <id>`（本文件今天重新確認的「回傳 ok:true 但沒關到」陷阱）也可能有同樣的變化。PR 描述另外提到 `close-surface`／`focus-surface`／`rename-surface`／`close-pane` 這組「用 id 找目標」的指令，改成在整個視窗範圍找 id，不再限定只在作用中 workspace 裡找——**這點如果屬實，可能表示今天記錄的 `close-pane --surface` 无效這個陷阱在 v0.43.0 有機會被修正，但這純粹是讀 PR 描述的推論，沒有實機測過，不能當作已解決。**
+- **本文件現在的立場**：跟既有的 v0.39.0–v0.41.0 資訊一樣，v0.43.0 目前只是「已知資訊」，不是驗證基準，本文件所有具體行為結論繼續以 v0.42.0 的實機紀錄為準。等實際升級到 v0.43.0 後，優先重跑「定位 pane／surface」表格裡標成 ❌ 無效的那幾條（`split`/`new-surface --pane`、`close-pane --surface`）和多視窗 caller 定位的複製 id edge case，因為這兩塊最可能已經變了。
+
 ## 執行前的授權邊界：四類操作
 
 呼叫任何 wmux 指令前，先判斷它屬於哪一類，套用對應的謹慎程度。這四類跟後面「定位是否可靠」是不同維度，兩者都要顧到：
