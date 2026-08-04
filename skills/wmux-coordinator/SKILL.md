@@ -1,6 +1,6 @@
 ---
 name: wmux-coordinator
-description: 在 wmux 多視窗終端機環境下，作為 orchestrator 對其他 pane 裡跑著不同 harness（Codex、Claude Code、Pi 等）的 agent 派工、追蹤進度、回收結果。使用者說「幫我把這個交給那幾個 pane 做」「盯著其他 pane 的進度」「協調一下其他 agent」等語句時觸發。建立在 `../wmux-best-practice/SKILL.md` 已驗證的 primitive 之上，不重複其授權邊界與 send/read-screen 核對流程；內容以實測驗證為準。
+description: 在 wmux 多視窗終端機環境下，作為 orchestrator 對其他 pane 裡跑著不同 harness（Codex、Claude Code、Pi 等）的 agent 派工、追蹤進度、回收結果。使用者說「幫我把這個交給那幾個 pane 做」「盯著其他 pane 的進度」「協調一下其他 agent」等語句時觸發。
 ---
 
 # wmux-coordinator

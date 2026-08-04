@@ -1,6 +1,6 @@
 ---
 name: wmux-best-practice
-description: 在 wmux（多視窗終端機）環境下操作其他 pane、跟另一個在互動運行的 agent 交接，或建立/清除 pane 與分頁時使用。使用者說「轉交給 codex/claude 那個 pane」「跟另一個 pane 說一聲」「切一個新的 pane」等語句、或畫面上出現多個 wmux pane 時觸發。內容以實測驗證為準，不是照抄 `wmux --help`；驗證環境見下方「驗證環境與適用範圍」。不涵蓋 `browser`／`markdown` 兩類指令——不在本技能範圍內。
+description: 在 wmux（多視窗終端機）環境下操作其他 pane、跟另一個在互動運行的 agent 交接，或建立/清除 pane 與分頁時使用。使用者說「轉交給 codex/claude 那個 pane」「跟另一個 pane 說一聲」「切一個新的 pane」等語句、或畫面上出現多個 wmux pane 時觸發。不涵蓋 `browser`／`markdown` 兩類指令——不在本技能範圍內。
 ---
 
 # wmux-best-practice
