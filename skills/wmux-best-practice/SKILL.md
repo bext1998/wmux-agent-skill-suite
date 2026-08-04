@@ -17,11 +17,11 @@ description: 在 wmux（多視窗終端機）環境下操作其他 pane、跟另
 2. **env 不足時的唯讀 fallback**：`$WMUX`／`$WMUX_SURFACE_ID` 缺一或全無時，改呼叫唯讀指令 `wmux identify`（或 `wmux ping`）。成功回應 → 判定身處 wmux（例如巢狀 shell 未繼承 env 的情況），但沒有 `WMUX_SURFACE_ID` 可用時，需另外用 `tree`／`list-panes` 找出自己的 surface id 才能繼續。失敗（非零 exit code 或錯誤）→ 判定不在 wmux 環境下。
 3. **env 可能過期時二次確認**：`$WMUX=1` 只代表這個 process 曾經繼承到該變數，不保證底層 pipe 目前仍存活。在依賴 env 判斷結果去執行任何非唯讀指令（可逆寫入／建立資源／破壞性操作）之前，先用 `identify` 或 `ping` 二次確認 pipe 仍然可用；只做唯讀查詢（如 `read-screen`）時可以省略這一步。
 4. **非 wmux 環境安靜退出**：判定不在 wmux 底下時，直接安靜跳過本技能其餘所有內容，不觸發、不嘗試任何其他 wmux 指令，也不需要向使用者報告「偵測失敗」這件事本身——除非使用者本來就是在問「這是不是 wmux 環境」。
-5. **版本漂移仍需重新驗證**：`identify`/`ping` 確認完「身處 wmux」只代表偵測本身成功，不代表下面「驗證環境與適用範圍」列出的具體行為結論（`--surface` 有效性、`close-pane` 是否真的關閉等）依然成立——版本不符時一律視同未驗證，套用下一節的重新確認方法。實測記錄：本文件行為基準最初建於 wmux 0.28.0，2026-07-29（win32）以 `wmux identify` 確認到 0.36.0 並重新核對過主要結論；本次遷移（2026-08-02，win32）再次以 `wmux identify`/`wmux capabilities` 現場確認版本為 **0.38.0**，但本次只重跑了 `identify`/`capabilities`/`wmux`（指令說明列表）/自身 `read-screen`，`--surface`/`--pane` 定位限制、`ok: true` 不保證成功、`close-pane --surface` 無效等既有結論**沿用 0.36.0 的實機紀錄，本次未在 0.38.0 上逐項重新驗證**。詳細範圍見下方「版本重新驗證紀錄（v0.38.0）」。
+5. **版本漂移仍需重新驗證**：`identify`/`ping` 確認完「身處 wmux」只代表偵測本身成功，不代表下面「驗證環境與適用範圍」列出的具體行為結論（`--surface` 有效性、`close-pane` 是否真的關閉等）依然成立——版本不符時一律視同未驗證，套用下一節的重新確認方法。實測記錄：本文件行為基準最初建於 wmux 0.28.0，2026-07-29（win32）以 `wmux identify` 確認到 0.36.0 並重新核對過主要結論；本次遷移（2026-08-02，win32）再次以 `wmux identify`/`wmux capabilities` 現場確認版本為 **0.38.0**，但本次只重跑了 `identify`/`capabilities`/`wmux`（指令說明列表）/自身 `read-screen`，`--surface`/`--pane` 定位限制、`ok: true` 不保證成功、`close-pane --surface` 無效等既有結論**沿用 0.36.0 的實機紀錄，本次未在 0.38.0 上逐項重新驗證**。詳細範圍見下方「版本重新驗證紀錄（v0.38.0）」。2026-08-04（win32）本機 wmux 升級到 **v0.42.0**，再次以 `wmux identify`/`wmux capabilities` 現場確認版本，本次額外對 `--workspace`/`--pane` 旗標與 `WMUX_SURFACE_ID` 的行為做了真實重跑驗證；但可逆寫入／建立資源／破壞性三類指令、`--surface` 定位限制、`ok: true` 不保證成功、`close-pane --surface` 無效等既有結論本次同樣**未在 v0.42.0 上逐項重新驗證**，繼續沿用 0.36.0/0.38.0 的實機紀錄。詳細範圍見下方「版本重新驗證紀錄（v0.42.0）」。
 
 ## 驗證環境與適用範圍
 
-以下所有具體行為結論（哪個旗標有效、預設會落在哪個 pane 等）的實機驗證基準是 `wmux identify` 回報 `version 0.28.0`／`0.36.0`，`platform win32`；`wmux capabilities` 回報 `protocols: ["v1","v2"]`、`features: ["workspaces","splits","notifications"]`。`0.38.0` 現場確認過版本號、capabilities 與 `identify`/`capabilities`/`wmux`（指令說明列表）/自身 `read-screen` 這幾項，但**未逐項重新驗證**其餘具體結論（詳見下方「版本重新驗證紀錄（v0.38.0）」），因此上述行為結論目前仍以 0.36.0 的實機紀錄為準。**這些是特定版本下實測觀察到的行為，不是保證不變的 API 契約。** 在不同版本、不同平台（例如 macOS/Linux）或回報不同 protocol/feature 的 wmux instance 上，行為可能不同——換到新環境前，先用 `identify`／`capabilities` 核對版本與能力，若版本不同就視同未驗證，用本文件的判斷方法（呼叫前後用唯讀指令核對）重新確認一次，不要直接套用下面列出的具體結論。
+以下所有具體行為結論（哪個旗標有效、預設會落在哪個 pane 等）的實機驗證基準是 `wmux identify` 回報 `version 0.28.0`／`0.36.0`，`platform win32`；`wmux capabilities` 回報 `protocols: ["v1","v2"]`、`features: ["workspaces","splits","notifications"]`。`0.38.0` 現場確認過版本號、capabilities 與 `identify`/`capabilities`/`wmux`（指令說明列表）/自身 `read-screen` 這幾項，但**未逐項重新驗證**其餘具體結論（詳見下方「版本重新驗證紀錄（v0.38.0）」），因此上述行為結論目前仍以 0.36.0 的實機紀錄為準。`0.42.0` 現場確認過版本號、capabilities，以及 `--workspace`/`--pane` 旗標、`WMUX_SURFACE_ID` 的實際行為（詳見下方「版本重新驗證紀錄（v0.42.0）」），但同樣**未逐項重新驗證**本節其餘具體結論，因此除了上述已驗證項目外，其餘行為結論目前仍以 0.36.0 的實機紀錄為準。**這些是特定版本下實測觀察到的行為，不是保證不變的 API 契約。** 在不同版本、不同平台（例如 macOS/Linux）或回報不同 protocol/feature 的 wmux instance 上，行為可能不同——換到新環境前，先用 `identify`／`capabilities` 核對版本與能力，若版本不同就視同未驗證，用本文件的判斷方法（呼叫前後用唯讀指令核對）重新確認一次，不要直接套用下面列出的具體結論。
 
 ### 版本重新驗證紀錄（v0.38.0）
 
@@ -49,14 +49,24 @@ description: 在 wmux（多視窗終端機）環境下操作其他 pane、跟另
 - **核心 primitive 差異**：`send`、`send-key`、`read-screen`、`tree`、`list-panes`、`split`、`close-pane`、`agent spawn` 等本文件既有記錄的核心指令，在上述四份 Release Notes 裡都沒有被提及有任何行為變更——這是「Release Notes 沒提到」的間接推論，不是逐項重新實測的直接證據，仍應視同「未變更但未重新驗證」，套用本文件既有的版本漂移處理方法。
 - **結論**：v0.38.0 作為本次 v0.0.1 發布的驗證基準持續有效；v0.41.0 除了已知效能問題外，新增的 `answer-agent`/`agent-state` 家族在 v0.38.0 上不存在也未實測，維持「已知限制、不採用、不宣稱已驗證」的既有立場。
 
-### v0.42.0 已知資訊（僅來自官方 release notes／commit diff，尚未實機驗證）
+### 版本重新驗證紀錄（v0.42.0）
 
-2026-08-03 發布的 `v0.42.0`（[release notes](https://github.com/amirlehmam/wmux/releases/tag/v0.42.0)）明確修復了促使本文件當初放棄 v0.41.0、改採 v0.38.0 的那兩個嚴重效能問題（對應 upstream issue #141、#139）。以下內容全部來自比對官方 release notes 與對應 commit（`8954e793bdb29c2df3325f7580372c99c922a349`、`8807caab6b25c81d5c71d0df4a39ef38b5751a48`、`64b2db877dd8ddfd3ad965c5fc9db2d3bec92dbf`）的 diff，**不是**本技能在真實 Windows wmux 環境下重跑 `identify`/`capabilities`/互動流程得到的結果——依「靜默環境偵測」第 5 點與本文件既有的版本漂移處理方法，這類結論一律視為未驗證，不得當作已確認的行為結論使用，也**不改變**本文件目前以 v0.38.0 為準的既有結論與版本基準：
+2026-08-03 發布的 `v0.42.0`（[release notes](https://github.com/amirlehmam/wmux/releases/tag/v0.42.0)）修復了促使本文件當初放棄 v0.41.0、改採 v0.38.0 的那兩個嚴重效能問題（對應 upstream issue #141、#139）。2026-08-04（win32），本機 wmux 已實際運行 v0.42.0，對以下項目完成真實 Windows wmux 實機驗證（取代先前僅依 release notes／commit diff 推論、標註「尚未實機驗證」的版本）：
 
-- **`--workspace`／`--pane` 旗標修好了**：`wmux tree --workspace <id>` 先前會解析旗標但直接丟棄、永遠回報目前作用中的 workspace；`list-surfaces --workspace <id>` 同樣忽略該旗標，`--pane` 也從未套用。commit diff（`src/cli/wmux.ts`）顯示這兩個指令現在會把旗標真正帶進 RPC 呼叫。本文件目前未記錄任何 `--workspace` 相關的操作結論（既有內容只涵蓋單一作用中 workspace 內的 pane 操作），所以這不牴觸任何既有段落，只是留待未來若要擴充多 workspace 操作時的已知起點。
-- **`WMUX_SURFACE_ID` 的用途擴大**：先前只有 `browser.*` 指令會把呼叫者的 `WMUX_SURFACE_ID` 當作 `caller` 帶進 RPC（為了讓並行 agent 各自對到自己的瀏覽器 pane，issue #62）；v0.42.0 起所有 V2 指令都會帶。用途是讓多視窗環境下的狀態查詢（`tree`、`list-surfaces` 等）回答「呼叫者所在視窗」，而不是 Electron `getAllWindows()[0]` 這個順序不保證的任意視窗。這跟本文件「靜默環境偵測」第 1 點『檢查 `$WMUX_SURFACE_ID` 是否存在』是不同層面的事——那一步是 agent 自己讀 env 變數判斷是否身處 wmux，不依賴 wmux CLI 內部怎麼轉發這個值給 main process；本次上游修正不影響那個判斷方法，子 process 是否繼承到 `WMUX_SURFACE_ID` 純粹是一般 OS/shell 的 env 繼承行為，跟 wmux 版本無關。
-- **Diff Pane 與 crash 後 process 回收不在本技能範圍內**：release notes 提到的 diff pane 輪詢失控狂噴 `git.exe`、關閉分頁後被 hook 自動重開、以及異常退出後殘留 process 樹會在下次啟動被回收，都是 wmux app 本身（Electron main process／renderer）的行為，不是本技能涵蓋的「操作其他 pane」CLI primitive（本文件 frontmatter 已明確排除 `browser`／`markdown` 類指令，diff pane 同理不是本技能的操作對象）。因此這部分改善不需要、也沒有對應段落可修改。
-- **本次未做、且不能省略的部分**：未安裝／未以任何形式啟動 v0.42.0，因此沒有 `wmux identify`／`wmux capabilities` 現場輸出可核對版本號與 capabilities，也沒有對真實 pane 重跑「執行前的授權邊界」「`ok: true` 不代表成功」「定位 pane／surface」三節列出的任何指令。在完成真正的 Windows wmux v0.42.0 實機驗證、並依 `../../docs/testing.md` 第 2 節的方法把結果記錄進一份新的「版本重新驗證紀錄（v0.42.0）」之前，本文件的驗證基準維持 v0.38.0 不變。
+- **版本**：`v0.42.0`（annotated tag，tag object SHA `a3f39aac07aae20f9f69b4354cfbc0766b86ba7f`，指向 commit `64b2db877dd8ddfd3ad965c5fc9db2d3bec92dbf`）
+- **平台**：`win32`（`wmux identify` 現場確認）
+- **capabilities**：`protocols: ["v1","v2"]`，`features: ["workspaces","splits","notifications"]`（與 v0.38.0 一致，未觀察到新增/移除的 protocol 或 feature）
+- **本次實際重跑並確認的項目**：
+  - `wmux identify` 現場回應 `{"name":"wmux","version":"0.42.0","platform":"win32"}`。
+  - `wmux capabilities` 現場回應如上。
+  - `$WMUX_SURFACE_ID` 在本機互動 shell 中存在、且被子 process 正常繼承（依「靜默環境偵測」第 1 點規則，只確認存在，未印出 `$WMUX_PIPE_TOKEN`）。
+  - **`--workspace` 旗標修好了**：本機同時存在兩個 workspace（一個作用中、一個非作用中）。`wmux tree --workspace <非作用中 workspace 的 id>` 正確回傳該 workspace 實際的 pane 樹（內容與目前作用中 workspace 不同、與該 workspace 真實 cwd 一致），不再是先前 bug 描述的「解析旗標但丟棄、永遠回報目前作用中 workspace」；`wmux list-surfaces --workspace <同一 id>` 同樣正確回傳該 workspace 的 surface 清單，與不帶旗標時（回報目前作用中 workspace 的 surface）不同。
+  - **`--pane` 旗標修好了**：`wmux list-surfaces --pane <id>` 單獨使用（鎖定目前作用中 workspace 內某個 pane）、以及與 `--workspace` 併用（鎖定非作用中 workspace 內某個 pane），皆正確只回傳該 pane 對應的單一 surface，不再是先前「從未套用」、旗標被忽略的狀態。
+  - 本文件目前未記錄任何 `--workspace` 相關的操作結論（既有內容只涵蓋單一作用中 workspace 內的 pane 操作），所以以上驗證不牴觸任何既有段落，是留待未來若要擴充多 workspace 操作時的已驗證起點。
+- **`WMUX_SURFACE_ID` 用途擴大這件事本身，仍只驗證到「env 存在且被繼承」，未驗證多視窗場景**：release notes／commit diff 聲稱 v0.42.0 起所有 V2 指令都會把呼叫者的 `WMUX_SURFACE_ID` 當作 `caller` 帶入 RPC，讓多視窗環境下的狀態查詢回答「呼叫者所在視窗」而非 Electron `getAllWindows()[0]` 這個順序不保證的任意視窗——本機只有單一 wmux app 視窗（多個 workspace 共用同一視窗），無法實際製造「有多個 wmux 視窗、驗證查詢是否真的對到呼叫者那個視窗」的場景，這部分語意仍是**推論、未實機驗證**。這跟本文件「靜默環境偵測」第 1 點『檢查 `$WMUX_SURFACE_ID` 是否存在』是不同層面的事——那一步是 agent 自己讀 env 變數判斷是否身處 wmux，不依賴 wmux CLI 內部怎麼轉發這個值給 main process；上游這項修正不影響那個判斷方法。
+- **未重跑、沿用既有紀錄的項目**：本次只驗證了上述唯讀查詢類指令。「執行前的授權邊界」四類操作中的可逆寫入／建立資源／破壞性三類（`send`、`send-key`、`notify`、`split`、`new-surface`、`agent spawn`、`pane close`、`close-surface`、`agent kill` 等）、`--surface` 定位限制、`ok: true` 不保證成功、`close-pane --surface` 無效、跨 pane 的 `send`/`send-key` 交接流程等既有結論，本次**未在 v0.42.0 上逐項重新驗證**，繼續沿用 0.36.0/0.38.0 的實機紀錄，不得視為已對 v0.42.0 完成驗證。
+- **Diff Pane 與 crash 後 process 回收不在本技能範圍內**：release notes 提到的 diff pane 輪詢失控狂噴 `git.exe`、關閉分頁後被 hook 自動重開、以及異常退出後殘留 process 樹會在下次啟動被回收，都是 wmux app 本身（Electron main process／renderer）的行為，不是本技能涵蓋的「操作其他 pane」CLI primitive（本文件 frontmatter 已明確排除 `browser`／`markdown` 類指令，diff pane 同理不是本技能的操作對象）。這部分本次未測試、也不需要測試，維持僅來自 release notes 的紀錄。
+- **結論**：`--workspace`/`--pane` 旗標修復、`WMUX_SURFACE_ID` env 存在與繼承，已由「僅來自 release notes/commit diff」升級為已實機驗證；`WMUX_SURFACE_ID` 的多視窗 caller 語意、以及本節以外本文件記錄的其餘具體行為結論（授權四類操作、`--surface` 定位限制、`ok: true` 可靠性、跨 pane 交接等），驗證基準維持 0.36.0/0.38.0 不變，尚未在 v0.42.0 上逐項重新驗證。
 
 ## 執行前的授權邊界：四類操作
 

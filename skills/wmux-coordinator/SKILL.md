@@ -106,7 +106,7 @@ BLOCKED#<id>: 一句話說明卡在什麼決策或資訊上
 
 ### v0.42.0 已知資訊
 
-`../wmux-best-practice/SKILL.md` 新增了「v0.42.0 已知資訊（僅來自官方 release notes／commit diff，尚未實機驗證）」段落，記錄該版本修好了 v0.41.0 促成本機降版的效能問題、以及 `--workspace`／`--pane`／`WMUX_SURFACE_ID` 相關 CLI 表面異動——依本文件慣例（引用 `wmux-best-practice` 的版本紀錄，不另立一份），細節見該段落，不在此重複。核心結論：本文件的 Worker Registry、單行任務協議、per-harness 適配層皆未使用到 `--workspace` 或多視窗路由，這些異動不影響本文件既有的派工流程；驗證基準同樣維持 v0.38.0，待實機驗證 v0.42.0 後再一併更新兩份文件。
+`../wmux-best-practice/SKILL.md` 的「版本重新驗證紀錄（v0.42.0）」記錄該版本修好了 v0.41.0 促成本機降版的效能問題，並已於 2026-08-04（win32）對 `--workspace`／`--pane` 旗標、`WMUX_SURFACE_ID` env 存在與繼承完成真實實機驗證——依本文件慣例（引用 `wmux-best-practice` 的版本紀錄，不另立一份），細節見該段落，不在此重複。核心結論：本文件的 Worker Registry、單行任務協議、per-harness 適配層皆未使用到 `--workspace` 或多視窗路由，這些異動不影響本文件既有的派工流程；但本文件實際依賴的 `send`/`read-screen` 輪詢與上面「Per-harness 適配層」表格內的即時互動行為，本次未在 v0.42.0 上重新驗證，這部分驗證基準維持 v0.38.0 不變，待另外對真實 pane 重跑後再一併更新。
 
 ## 邊界
 
