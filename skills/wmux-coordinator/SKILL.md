@@ -98,8 +98,8 @@ BLOCKED#<id>: 一句話說明卡在什麼決策或資訊上
 
 ## 邊界
 
-- 授權邊界、`send`/`read-screen` 核對流程、`--surface` 定位限制、`ok: true` 不代表成功等結論，一律引用 `../wmux-best-practice/SKILL.md`，不在本文件複製或另立一份，避免兩份文件漂移。
-- 不透過本技能建立任何跨 session 持久化的狀態檔、佇列或背景服務；worker registry 只存在於當次 orchestrator session。
-- 不對忙碌中的 pane 送出新指令；忙碌與空閒的判斷依「per-harness 適配層」或「畫面內容是否變化」，不得單純假設對方一定閒置。
-- 收到 `BLOCKED#<id>` 或判定 `unresponsive` 時，不得自行替對方做決策後继续派工，一律先 `notify` 人類。
-- 不使用 `agent spawn` 去「附加」一個已經在互動運行的既有 pane（沿用 `../wmux-best-practice/SKILL.md` 的既有結論）；worker 一律是已經存在、透過 `tree`／`list-panes` 找到的互動 pane。
+- 授權邊界、`send`/`read-screen` 核對流程、`--surface` 定位限制、`ok: true` 不代表成功等結論一律引用 `../wmux-best-practice/SKILL.md`，不在本文件複製。
+- worker registry 只存在於當次 orchestrator session（見「Worker Registry」）。
+- 不對忙碌中的 pane 送出新指令（判斷依「per-harness 適配層」或畫面內容是否變化）。
+- 收到 `BLOCKED#<id>` 或判定 `unresponsive` 一律先 `notify` 人類，不自行替對方做決策（見「升級規則」）。
+- 不使用 `agent spawn` 附加既有互動中的 pane（同 `../wmux-best-practice/SKILL.md`）；worker 一律是已存在、透過 `tree`／`list-panes` 找到的互動 pane。

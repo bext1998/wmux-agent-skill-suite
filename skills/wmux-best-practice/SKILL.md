@@ -37,11 +37,7 @@ description: 在 wmux（多視窗終端機）環境下操作其他 pane、跟另
 
 ## 核心原則：`ok: true` 不代表指令真的做到了
 
-這是整份技能最重要的一條通用警語。實測發現多個 wmux 指令會不管三七二十一回傳 `{"ok": true}`，但實際上什麼都沒做，或做在錯的目標上：
-
-- `close-pane --surface <id>` 回傳 `ok: true`，但目標 pane 完全沒被關掉。
-- `clear-notifications`（不帶參數或帶 `--surface`）回傳 `ok: true`，但通知清單完全沒變。
-- `split`／`new-surface --pane <id>` 回傳成功，但實際建立的位置跟你指定的 `--pane`／`--surface` 無關。
+這是整份技能最重要的一條通用警語。實測發現多個 wmux 指令會不管三七二十一回傳 `{"ok": true}`，但實際上什麼都沒做，或做在錯的目標上（`close-pane --surface`、`clear-notifications`、`split`／`new-surface --pane` 皆屬此類，具體案例見下方「定位 pane／surface」表格與各操作小節）。
 
 **任何會改變狀態的呼叫，呼叫後都要用對應的唯讀指令（`read-screen`、`list-panes`、`tree`、`list-notifications`）重新查一次，確認真的發生了你以為發生的事，不要只看 `ok: true` 就當作成功。**
 
@@ -118,9 +114,9 @@ description: 在 wmux（多視窗終端機）環境下操作其他 pane、跟另
 
 ## 邊界
 
-- 呼叫前依「執行前的授權邊界」判斷屬於唯讀/可逆寫入/建立資源/破壞性哪一類，破壞性操作一律需要精確 ID 核對與使用者授權。
-- 建立/移除 pane、分頁、agent process 前後，一律用 `tree`/`list-panes`/`agent list` 核對實際狀態，不要只信呼叫的回傳值。
-- 不透過 `agent spawn` 或任何其他機制去附加、控制一個已經在互動運行的既有 pane——那不是這組指令的設計用途。
-- 不呼叫 `token`、不執行 `hook --event`、不呼叫 `ssh`/`bridge`——這些不在本技能範圍內。
-- 對其他 pane 送出文字前，先 `read-screen` 確認狀態；送出後，在按 `send-key enter` 之前再 `read-screen` 一次確認內容正確落在目標 pane。
-- `report-agent`/`answer-agent`/`report-metadata`/`report-session`/`release-agent`/`agent-state` 這組指令本文件不採用（見 [CHANGELOG.md](../../CHANGELOG.md) 的版本差異調查），未確認目標環境版本前不要假設它們可用。
+- 呼叫前依「執行前的授權邊界」分類；破壞性操作一律需要精確 ID 核對與使用者授權。
+- 建立/移除 pane、分頁、agent process 前後一律用唯讀指令核對實際狀態（見「`ok: true` 不代表指令真的做到了」）。
+- 不用 `agent spawn` 附加、控制既有互動中的 pane（見「Agent 指令家族」）。
+- 不呼叫 `token`、不執行 `hook --event`、不呼叫 `ssh`/`bridge`（見「不建議使用／超出範圍」）。
+- 對其他 pane 送出文字前後都要 `read-screen` 核對（見「向另一個互動 agent pane 送出訊息」的完整流程）。
+- `report-agent`/`answer-agent`/`report-metadata`/`report-session`/`release-agent`/`agent-state` 這組指令不採用（見 [CHANGELOG.md](../../CHANGELOG.md)）。
