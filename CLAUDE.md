@@ -9,7 +9,7 @@
 ## 工作規則
 
 1. **技能內容以實測為準**：修改 `skills/*/SKILL.md` 內任何行為結論前，先確認是否有對應的實測依據；沒有實測依據的內容要明確標註「未驗證」，不要包裝成確定結論。規則細節見 [docs/skill-authoring-rules.md](docs/skill-authoring-rules.md)。
-2. **不縮減既有能力**：兩個技能都是從 maze-coder 遷移而來，遷移/更名/後續修訂都不得刪減既有段落、表格列或實測紀錄，只能以獨立段落追加或標註更正（沿用 `wmux-coordinator` 既有的「重要更正」寫法）。
+2. **不縮減既有能力**：兩個技能都是從 maze-coder 遷移而來，遷移/更名/後續修訂都不得刪減既有段落、表格列或行為結論，只能以獨立段落追加或標註更正（沿用 `wmux-coordinator` 既有的「重要更正」寫法）。**例外**：版本驗證的過程與觀察紀錄（哪天測的、怎麼測的、用了哪些 ID）不算「既有段落」，一律寫進 `CHANGELOG.md`，不留在 SKILL.md 本體——SKILL.md 只保留 agent 執行任務時需要的結論，規則見 [docs/skill-authoring-rules.md](docs/skill-authoring-rules.md) 第 4、22 條。
 3. **coding agent 中立**：技能內容不得引用特定 coding agent 的 plugin/hook/subagent API、模型名稱或固定安裝路徑。差異只放在 `docs/install.md`、`scripts/install.sh`。
 4. **相對路徑引用**：`wmux-coordinator` 對 `wmux-best-practice` 的引用一律用相對路徑，修改檔案位置時要同步檢查引用是否仍然有效（`tests/validate-references.sh` 會檢查）。
 5. **不建立與 maze-coder 的執行期相依**：不呼叫 maze-coder 的 script、不讀取其設定、不建立同步副本。

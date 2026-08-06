@@ -7,7 +7,20 @@
 ### Added
 
 - 追蹤 upstream wmux `v0.42.0`（2026-08-03 發布，[release notes](https://github.com/amirlehmam/wmux/releases/tag/v0.42.0)）的已知資訊（issue #8）：該版本修好了造成本專案放棄 `v0.41.0`、改採 `v0.38.0` 的兩個嚴重效能問題（diff pane 輪詢失控狂噴 `git.exe`、crash 後 process 樹殘留），以及 `wmux tree --workspace`／`list-surfaces --workspace`/`--pane` 旗標修復、V2 指令全面攜帶 `WMUX_SURFACE_ID` 這兩項 CLI 表面異動。內容全部來自比對官方 release notes 與對應 commit，**未進行 Windows wmux 實機驗證**，因此本次不變更「版本重新驗證紀錄」或版本基準（維持 `v0.38.0`），也不宣稱已對 `v0.42.0` 完成適配。詳見兩個技能檔案內新增的「v0.42.0 已知資訊」段落與 [README.md](README.md#版本基準)。後續若要正式將驗證基準升級到 `v0.42.0`，需要另外完成 `docs/testing.md` 第 2 節描述的實機驗證流程。
-- 2026-08-04：本機 wmux 已實際升級到 `v0.42.0`，依 `docs/testing.md` 第 2 節完成部分 Windows wmux 實機驗證（issue #8 後續）：`wmux identify`／`wmux capabilities` 現場確認版本與 capabilities；對真實存在的兩個 workspace 現場重跑 `wmux tree --workspace <id>`／`wmux list-surfaces --workspace <id>`／`wmux list-surfaces --pane <id>`，確認 `--workspace`／`--pane` 旗標修復屬實（正確回傳指定 workspace／pane 的內容，不再是先前忽略旗標的行為）；確認 `$WMUX_SURFACE_ID` 存在且被子 process 繼承。上述項目已由「僅來自 release notes/commit diff」升級為已實機驗證，記錄進兩個技能檔案的「版本重新驗證紀錄（v0.42.0）」。`WMUX_SURFACE_ID` 的多視窗 caller 語意（因本機只有單一 wmux 視窗，無法測）、以及非唯讀三類操作（可逆寫入／建立資源／破壞性）、`ok: true` 可靠性、跨 pane 交接、per-harness 適配層等其餘既有結論，本次**未在 v0.42.0 上逐項重新驗證**，繼續沿用 `v0.38.0` 記錄；整體驗證基準因此維持 `v0.38.0`，僅上述已列出項目視為已對 `v0.42.0` 驗證。
+- 2026-08-04：本機 wmux 已實際升級到 `v0.42.0`，依 `docs/testing.md` 第 2 節完成部分 Windows wmux 實機驗證（issue #8 後續）：`wmux identify`／`wmux capabilities` 現場確認版本與 capabilities；對真實存在的兩個 workspace 現場重跑 `wmux tree --workspace <id>`／`wmux list-surfaces --workspace <id>`／`wmux list-surfaces --pane <id>`，確認 `--workspace`／`--pane` 旗標修復屬實（正確回傳指定 workspace／pane 的內容，不再是先前忽略旗標的行為）；確認 `$WMUX_SURFACE_ID` 存在且被子 process 繼承。上述項目已由「僅來自 release notes/commit diff」升級為已實機驗證，記錄進兩個技能檔案。`WMUX_SURFACE_ID` 的多視窗 caller 語意（因本機只有單一 wmux 視窗，無法測）、以及非唯讀三類操作（可逆寫入／建立資源／破壞性）、`ok: true` 可靠性、跨 pane 交接、per-harness 適配層等其餘既有結論，本次**未在 v0.42.0 上逐項重新驗證**，繼續沿用 `v0.38.0` 記錄；整體驗證基準因此維持 `v0.38.0`，僅上述已列出項目視為已對 `v0.42.0` 驗證。
+- 2026-08-05：在一個獨立測試 workspace（不影響既有 pane，測完已 `close-workspace` 清除）補完 `v0.42.0` 上剩下的三類非唯讀操作與多視窗場景（issue #8 完成）：
+  - `send`/`send-key` 確認生效（用寫入磁碟檔案的副作用驗證）；同一批測試中，對非呼叫者自身的 surface 呼叫 `read-screen` 連續 5 次全部空讀（含一個已確認生效的測試 pane、隔壁真實在用的 pi pane），比既有「間歇性空讀」描述更頻繁（樣本數小，不代表 v0.42.0 必然如此）。
+  - `notify` 確認可用，成功回應是純文字 `Notification sent`（不是 `{"ok":true}`）。`clear-notifications` 疑似不生效：`ok:true` 但通知未被清除（新發現，殘留一筆測試通知待使用者手動清）。
+  - `split`／`new-surface --pane` 無效、固定落在作用中 workspace 第一個 leaf pane 的既有結論重新確認成立；新發現 `agent spawn --pane` 可靠，會準確落在指定的既有 pane（跟前兩者不同）。
+  - `agent kill`、`close-surface`、`pane close`（verb form）、`close-workspace` 確認可靠；`close-pane --surface` 無效的既有結論重新確認成立。
+  - 用 `new-window` 建立第二個真實 OS 視窗後，從原視窗呼叫不帶 `--workspace` 的 `list-workspaces`/`tree` 只回傳呼叫者自己視窗的資料——`WMUX_SURFACE_ID` 的多視窗 caller 語意首次取得直接實機證據。找不到任何 CLI 指令可以關閉 `new-window` 開的視窗，殘留視窗需使用者手動關閉。
+  - 整體驗證基準由 `v0.38.0` 正式升級為 `v0.42.0`：「執行前的授權邊界」四類操作已全數在 `v0.42.0` 上逐項重新驗證。
+  - `wmux-coordinator` 同步加註：`read-screen` 對非自身 surface 的空讀比例比預期更高，對其派工輪詢流程有直接影響，需更依賴既有的「空讀先重讀」處理。
+  - 同日 upstream 又發布 `v0.43.0`（[PR #144](https://github.com/amirlehmam/wmux/pull/144)，本機未升級，仍是 `v0.42.0`）：純文件調查記錄兩個相關修正——(1) 修正「新視窗複製到重複 surface id、導致 caller 定位選錯視窗」的 edge case，跟本次驗證的乾淨雙視窗情境不同，未涵蓋；(2) 未知旗標從「靜默忽略、指令照跑」改成「直接拒絕」，可能影響 `split`／`new-surface --pane`（現況：靜默忽略）與 `close-pane --surface`（現況：`ok:true` 無效）的行為，未實機驗證，升級後應優先重測。
+
+### Changed
+
+- 重整兩個技能檔案的版本驗證紀錄存放位置：SKILL.md 不再逐版列出「版本重新驗證紀錄」段落（怎麼測的、哪天測的、用了哪些 ID），只保留目前驗證基準（一段話）與目前仍然成立的行為結論；逐版驗證方式、觀察紀錄、release notes 差異調查一律移到本檔案。理由：SKILL.md 是 agent 執行任務時要讀的操作指南，不是驗證過程的紀錄本，過程細節混在裡面會讓技能檔案膨脹、難以快速抓到當下該怎麼做。同步更新 `docs/skill-authoring-rules.md`（第 4、18、22 條）、`CLAUDE.md`、`AGENTS.md` 反映這個慣例。
 
 ## [0.0.1] - 2026-08-02
 

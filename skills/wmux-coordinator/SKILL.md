@@ -1,6 +1,6 @@
 ---
 name: wmux-coordinator
-description: 在 wmux 多視窗終端機環境下，作為 orchestrator 對其他 pane 裡跑著不同 harness（Codex、Claude Code、Pi 等）的 agent 派工、追蹤進度、回收結果。使用者說「幫我把這個交給那幾個 pane 做」「盯著其他 pane 的進度」「協調一下其他 agent」等語句時觸發。建立在 `../wmux-best-practice/SKILL.md` 已驗證的 primitive 之上，不重複其授權邊界與 send/read-screen 核對流程；內容以實測驗證為準。
+description: 在 wmux 多視窗終端機環境下，作為 orchestrator 對其他 pane 裡跑著不同 harness（Codex、Claude Code、Pi 等）的 agent 派工、追蹤進度、回收結果。使用者說「幫我把這個交給那幾個 pane 做」「盯著其他 pane 的進度」「協調一下其他 agent」等語句時觸發。
 ---
 
 # wmux-coordinator
@@ -92,26 +92,14 @@ BLOCKED#<id>: 一句話說明卡在什麼決策或資訊上
 
 其他 harness（例如 opencode、其他 Claude Code pane）尚未實測，套用前比照上表方法：先用一次性測試任務、並在任務進行中高頻輪詢（不要只等任務結束後才看一次），觀察忙碌指標與完成標記的實際呈現，再正式納入派工流程；不要直接假設會跟上表兩種 harness 行為一致，也不要只憑歷史畫面裡的文字推論忙碌指標——上面兩個更正就是這麼犯錯的。
 
-## 版本重新驗證紀錄（v0.38.0）
+## 版本適用範圍
 
-本技能遷移至獨立 repository 時，最初與 `../wmux-best-practice/SKILL.md` 同步以當時 wmux 官方最新正式版 v0.41.0 重新核對；使用者於實際使用中回報 v0.41.0 有嚴重效能問題，因此本機降版至 v0.38.0，本段落改以 v0.38.0 作為本次遷移的實際適配與驗證基準：`v0.38.0`（annotated tag SHA `60dd5e51e1ccf269b3d59290f33b985a79763837`，commit `7882751c57da360635d22c36ff13f6294af27796`，`platform win32`，capabilities `protocols: ["v1","v2"]`／`features: ["workspaces","splits","notifications"]`，與先前版本一致）。
-
-本次實際重跑並確認的項目：`wmux identify`、`wmux capabilities`、`wmux`（完整指令說明列表）；未重跑、沿用既有記錄的項目：上面「Per-harness 適配層」表格內對 Codex／Pi 的即時互動實測（忙碌畫面、完成標記、輸入框呈現），本次未重新對真實 pane 執行，仍以既有記錄為準，不視為已針對 0.38.0 重新驗證。
-
-`../wmux-best-practice/SKILL.md` 的版本重新驗證紀錄已確認：`report-agent`／`answer-agent`／`report-metadata`／`report-session`／`release-agent`／`agent-state` 這組與「agent 回報自身狀態、blocked 回覆」相關的 CLI 表面，**只在 v0.41.0 觀察到，在本文件的驗證基準版本 v0.38.0 上不存在**。由於 v0.41.0 本身有使用者回報的嚴重效能問題、未採用為適配基準，這組指令目前不具備可用的驗證環境，本文件的派工流程與升級規則維持原本以 `send`/`read-screen` 輪詢單行標記的既有做法作為唯一已驗證路徑，不引用或假設這組指令可用。
-
-### v0.0.1 發布前補充（2026-08-02）
-
-依 `../wmux-best-practice/SKILL.md` 對 upstream v0.39.0–v0.41.0 官方 Release Notes 的調查（純文件調查，非本機實測，詳見該檔案對應段落）：`answer-agent`（v0.41.0 新增）理論上可以讓 orchestrator 不必切換到目標 pane、直接對一個已宣告 `blocked` 且帶 `--choices` 的 agent 送出回覆，可能可以取代或補強上面「派工→核對→提交→輪詢」流程裡靠 `read-screen` 輪詢文字標記判斷 `BLOCKED#<id>` 的做法。但 upstream 官方文件明確聲明 **Claude Code 目前無法宣告 `--choices`**（只會傳出「需要你」訊號，不帶結構化選項資料），所以就算未來採用 v0.41.0，對 Claude Code worker 而言也不會有實際差異；只有主動採用這個宣告協議的 harness（可能包含 Codex、Pi，但兩者是否已支援未經查證，只是 upstream 文件沒有點名排除）才可能受益。這組指令在 v0.38.0 上不存在、v0.41.0 因效能問題未安裝，本文件的升級規則暫不採用，維持既有 `send`/`read-screen` 做法。
-
-### v0.42.0 已知資訊
-
-`../wmux-best-practice/SKILL.md` 的「版本重新驗證紀錄（v0.42.0）」記錄該版本修好了 v0.41.0 促成本機降版的效能問題，並已於 2026-08-04（win32）對 `--workspace`／`--pane` 旗標、`WMUX_SURFACE_ID` env 存在與繼承完成真實實機驗證——依本文件慣例（引用 `wmux-best-practice` 的版本紀錄，不另立一份），細節見該段落，不在此重複。核心結論：本文件的 Worker Registry、單行任務協議、per-harness 適配層皆未使用到 `--workspace` 或多視窗路由，這些異動不影響本文件既有的派工流程；但本文件實際依賴的 `send`/`read-screen` 輪詢與上面「Per-harness 適配層」表格內的即時互動行為，本次未在 v0.42.0 上重新驗證，這部分驗證基準維持 v0.38.0 不變，待另外對真實 pane 重跑後再一併更新。
+本文件的派工流程與 per-harness 適配層依賴 `../wmux-best-practice/SKILL.md` 的 `send`/`read-screen` primitive，驗證基準跟隨該文件（目前是 `wmux v0.42.0`，見該文件「驗證環境與適用範圍」）。`report-agent`／`answer-agent`／`report-metadata`／`report-session`／`release-agent`／`agent-state` 這組指令本文件不採用，理由同 `../wmux-best-practice/SKILL.md`。逐版驗證方式與觀察紀錄見 [CHANGELOG.md](../../CHANGELOG.md)，本文件只保留目前仍然成立的結論。
 
 ## 邊界
 
-- 授權邊界、`send`/`read-screen` 核對流程、`--surface` 定位限制、`ok: true` 不代表成功等結論，一律引用 `../wmux-best-practice/SKILL.md`，不在本文件複製或另立一份，避免兩份文件漂移。
-- 不透過本技能建立任何跨 session 持久化的狀態檔、佇列或背景服務；worker registry 只存在於當次 orchestrator session。
-- 不對忙碌中的 pane 送出新指令；忙碌與空閒的判斷依「per-harness 適配層」或「畫面內容是否變化」，不得單純假設對方一定閒置。
-- 收到 `BLOCKED#<id>` 或判定 `unresponsive` 時，不得自行替對方做決策後继续派工，一律先 `notify` 人類。
-- 不使用 `agent spawn` 去「附加」一個已經在互動運行的既有 pane（沿用 `../wmux-best-practice/SKILL.md` 的既有結論）；worker 一律是已經存在、透過 `tree`／`list-panes` 找到的互動 pane。
+- 授權邊界、`send`/`read-screen` 核對流程、`--surface` 定位限制、`ok: true` 不代表成功等結論一律引用 `../wmux-best-practice/SKILL.md`，不在本文件複製。
+- worker registry 只存在於當次 orchestrator session（見「Worker Registry」）。
+- 不對忙碌中的 pane 送出新指令（判斷依「per-harness 適配層」或畫面內容是否變化）。
+- 收到 `BLOCKED#<id>` 或判定 `unresponsive` 一律先 `notify` 人類，不自行替對方做決策（見「升級規則」）。
+- 不使用 `agent spawn` 附加既有互動中的 pane（同 `../wmux-best-practice/SKILL.md`）；worker 一律是已存在、透過 `tree`／`list-panes` 找到的互動 pane。
